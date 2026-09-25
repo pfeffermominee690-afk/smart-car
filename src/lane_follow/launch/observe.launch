@@ -1,0 +1,9 @@
+<launch>
+  <arg name="duration" default="3" />
+  <arg name="output" default="$(env HOME)/smartcar-data/runs/lane_follow/$(anon observation)" />
+  <arg name="config" default="$(find lane_follow)/config/lane_follow.json" />
+  <!-- Observation only; this may start the lidar but never enables driving. -->
+  <node pkg="lane_follow" type="lane_follow_node.py" name="lane_follow_observer"
+        output="screen" required="true"
+        args="--duration $(arg duration) --output '$(arg output)' --config '$(arg config)'" />
+</launch>
