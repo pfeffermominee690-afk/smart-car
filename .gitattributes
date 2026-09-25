@@ -6,3 +6,6 @@
 *.yaml text eol=lf
 *.json text eol=lf
 CODEOWNERS text eol=lf
+
+# Preserve the on-car source snapshot byte for byte, including original line endings.
+vehicle/** -text
