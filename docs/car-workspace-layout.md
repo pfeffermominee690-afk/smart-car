@@ -5,7 +5,7 @@
 `/home/smartcar/projects/smart-car` 是车上的 Git 仓库和 Catkin 工作空间。
 
 - `src/<包名>/`：所有实际模块源码，模块相关 launch、配置和测试也放在包中。
-- `scripts/`：构建、环境加载、Git 同步和手动试验入口。
+- `scripts/`：构建、环境加载和 Git 同步工具。
 - `output/build/`：CMake 缓存、目标文件及测试结果。
 - `output/devel/`：开发环境、编译后的可执行文件、共享库和消息生成代码。
 - `output/install/`：执行 install 目标时生成的安装结果。
@@ -45,7 +45,7 @@ git commit -m "feat(module): 说明修改"
 
 ## 模块入口
 
-- 底盘：`src/base_controller`；键盘入口 `scripts/keyboard_drive.sh`。
+- 底盘：`src/base_controller`；键盘及直行试验入口也在该包的 `scripts/` 中。
 - 相机：`src/usb_cam`；采用原相机工作空间中实际使用的版本，保留各 launch 文件。
 - 雷达：`src/ls01b_v2`。
 - 循线：`src/lane_follow`，Python 算法在 `python/lane_follow/`，节点在 `scripts/`，配置在 `config/`，测试在 `tests/`。

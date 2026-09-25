@@ -16,7 +16,7 @@ smart-car/
 │   ├── smartcar/                 # 现有历史视觉程序及消息
 │   ├── teleop_twist_keyboard/    # 通用 Twist 遥控工具
 │   └── lane_follow/              # 当前循线：节点、算法、配置、测试
-├── scripts/                      # 构建、环境、Git 和手动运行辅助脚本
+├── scripts/                      # 构建、环境与 Git 辅助脚本
 ├── docs/                         # 协作、部署和验证记录
 └── output/                       # build/、devel/、install/，不提交 Git
 ```

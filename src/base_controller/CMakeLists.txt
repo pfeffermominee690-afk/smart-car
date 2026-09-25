@@ -157,6 +157,8 @@ target_link_libraries(base_controller
 add_dependencies(base_controller ${catkin_EXPORTED_TARGETS})
 install(TARGETS base_controller RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(PROGRAMS scripts/keyboard_drive.sh scripts/straight_test.sh
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 #############
 ## Install ##

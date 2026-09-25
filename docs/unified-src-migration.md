@@ -21,7 +21,7 @@ usb_cam 采用原环境中 rospack 实际找到的相机工作空间版本；tel
 - 修正 laser_test 的 Catkin COMPONENTS 声明，补齐实际使用的依赖。
 - 巡线封装为 ROS 包，调整 Python 模块导入、配置定位及雷达可执行文件查找；算法、标定值、停车阈值和 3 秒限制保持原值。
 - 构建和环境脚本只使用 src 与 output，不依赖旧工作空间的编译缓存。
-- 原运行脚本移到 scripts，旧路径由仓库外的兼容入口保留。
+- 原键盘驾驶和直行试验脚本移入 src/base_controller/scripts；根目录 scripts 只保留构建、环境及 Git 工具。旧路径由仓库外的兼容入口保留。
 
 ## 验证记录
 

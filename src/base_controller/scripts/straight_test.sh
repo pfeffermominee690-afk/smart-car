@@ -2,7 +2,7 @@
 
 set -u
 
-workspace_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+workspace_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
 serial_device="/dev/serial/by-id/usb-STMicroelectronics_ZDRB_USBCOM_368032723034-if00"
 launch_log="/tmp/smartcar_straight_test.log"
 launch_pid=""
@@ -13,7 +13,12 @@ if [[ "$test_speed" != "-40" && "$test_speed" != "0" ]]; then
   exit 1
 fi
 
-source "$workspace_dir/setup_robot.sh"
+if [[ -f "$workspace_dir/../../../scripts/setup_robot.sh" ]]; then
+  source "$workspace_dir/../../../scripts/setup_robot.sh"
+elif ! command -v roslaunch >/dev/null 2>&1; then
+  echo "请先加载工作空间环境。" >&2
+  exit 1
+fi
 
 stop_car() {
   if [[ -n "$launch_pid" ]] && kill -0 "$launch_pid" 2>/dev/null; then
