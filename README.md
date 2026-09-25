@@ -2,7 +2,7 @@
 
 用于团队管理智能车比赛的模块开发、联调和比赛版本。
 
-仓库负责人及指定审核人：[@pfeffermominee690-afk](https://github.com/pfeffermominee690-afk)。四位队友使用各自的 GitHub 账户协作，人员名单在加入后更新。
+仓库负责人及指定审核人：[@pfeffermominee690-afk](https://github.com/pfeffermominee690-afk)。
 
 ## 开发流程
 
