@@ -1,5 +1,7 @@
 # 2026-09-25 小车源码同步记录
 
+本文件记录原始导入快照，对应提交 `e69cf0d` 中的 `vehicle/` 路径。当前源码已迁入 `src/`，旧清单用于历史追溯，现行布局见 [迁移记录](unified-src-migration.md)。
+
 ## 来源与范围
 
 通过 SSH 从主机 `smartcar-desktop`、用户 `smartcar` 的 `/home/smartcar` 读取以下三个目录：`newcar_ws`、`lane_follow_20260923`、`lane_follow_20260923_v2`。源码保持原内容；本次不重构历史版本，也不修改设备配置或启动驾驶程序。

@@ -12,7 +12,7 @@
 
 `output/` 在车上链接到 `~/smartcar-data/catkin/unified`，Git 明确忽略整个输出目录。在其他电脑上构建时，脚本直接创建本地 output 目录，无需建立链接。
 
-录像、日志、模型和备份在 `~/smartcar-data/` 中，不能放进源码目录提交。Python 临时字节码即使产生在源码目录也会被 Git 忽略。
+录像、日志、模型和备份在 `~/smartcar-data/` 中，不能放进源码目录提交。构建和环境脚本设置 `PYTHONDONTWRITEBYTECODE=1`，避免运行测试或模块时往源码目录写 Python 字节码；其他环境遗留的字节码也会被 Git 忽略。
 
 ## 开发流程
 

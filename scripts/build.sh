@@ -2,6 +2,7 @@
 set -eo pipefail
 repo_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
 source /opt/ros/melodic/setup.bash
+export PYTHONDONTWRITEBYTECODE=1
 mkdir -p "$repo_dir/output"
 catkin_make --directory "$repo_dir" --source "$repo_dir/src" \
   --build "$repo_dir/output/build" \
