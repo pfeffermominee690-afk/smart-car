@@ -31,4 +31,14 @@
 
 **CODEOWNERS 文件本身不能强制阻止合并。必须在 GitHub 设置中启用分支保护或规则集，并要求 Code Owner 审核。** 私有仓库是否支持取决于账户套餐；以 GitHub 设置中实际生效的规则为准。未启用保护前不要将其视为受保护的协作仓库。
 
-当前骨架未导入既有代码、系统镜像、安装包、试跑录像或设备连接信息。已有模块按 PR 流程逐个整理导入，保留来源和测试范围。
+## 车上源码基线
+
+已从小车读取 2026-09-25 的源码快照，位于 [`vehicle/`](vehicle/README.md)。包含主工作空间和两个版本的循迹原型，保留原路径关系、文件内容、可执行权限和 Linux 符号链接。
+
+来源、排除范围、文件 SHA-256 和测试结果见 [同步说明](docs/car-source-20260925.md)。系统镜像、安装包、编译产物、试跑录像及登录凭据不纳入本次同步。后续整理或改进代码仍按模块发起 PR。
+
+## 小车上的开发入口
+
+Ubuntu 上的主仓库位于 `~/projects/smart-car`。底盘、相机和雷达工作空间分别从 `workspaces/control`、`workspaces/cameras`、`workspaces/lidar` 进入；当前循迹代码从 `modules/lane_follow` 进入。
+
+在仓库中执行 `./scripts/car-git.sh status` 查看修改，提交后执行 `./scripts/car-git.sh push` 同步开发分支。目录、原路径兼容、备份和完整流程见 [车端开发指南](docs/car-workspace-layout.md)。

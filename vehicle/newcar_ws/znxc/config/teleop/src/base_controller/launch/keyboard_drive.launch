@@ -1,0 +1,8 @@
+<launch>
+  <arg name="serial_port" default="/dev/serial/by-id/usb-STMicroelectronics_ZDRB_USBCOM_368032723034-if00" />
+  <node name="base_controller" pkg="base_controller" type="base_controller" output="screen" required="true">
+    <param name="serial_port" value="$(arg serial_port)" />
+    <param name="baudrate" value="115200" />
+    <param name="serial_open_attempts" value="20" />
+  </node>
+</launch>

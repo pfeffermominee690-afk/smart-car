@@ -1,0 +1,2065 @@
+{
+  "excluded": [
+    {
+      "path": "newcar_ws/newcar_ws_source_20260921.tar.gz",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/.vscode",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/.vscode",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/teleop/src/base_controller.zip",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/leishen_ws/devel",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/leishen_ws/build",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/.vscode",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/devel",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/build",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/base_controller.zip",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/scripts/keyop.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd1.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd2.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd__.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/cmdcore_0606.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/lane_detect.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/resnet18.onnx",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/resnet18.onnx.1.1.7103.GPU.FP16.engine",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/stop_obj_avo.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "newcar_ws/znxc/config/teleop/src/serial/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/cam_test_ws/devel",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/cam_test_ws/build",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/.git",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "lane_follow_20260923/runs",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "lane_follow_20260923/lane_vision.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "lane_follow_20260923/test_lane.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "lane_follow_20260923_v2/runs",
+      "reason": "generated/history/runtime directory"
+    },
+    {
+      "path": "lane_follow_20260923_v2/lane_control.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "lane_follow_20260923_v2/lane_vision.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    },
+    {
+      "path": "lane_follow_20260923_v2/test_lane.pyc",
+      "reason": "generated/binary/runtime/archive artifact"
+    }
+  ],
+  "files": [
+    {
+      "mode": "100755",
+      "path": "newcar_ws/keyboard_drive.sh",
+      "sha256": "ebfa5c516177f083770dc7e2e0078984a29f5bd0c57ded5813fcd08d17ff8205",
+      "size": 2276,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/setup_robot.sh",
+      "sha256": "ff5db93dd0fe003273a0eaad94e2e7f17562e1cc423cee3c4d5c6f430524baca",
+      "size": 248,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/straight_test.sh",
+      "sha256": "37453d5c0fde23f7c8fa3161536412f8bf3f5454452e50c0842473efcef8a4bd",
+      "size": 3912,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/leishen_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/CMakeLists.txt",
+      "sha256": "e5cd84772bb61f0f70231d6329115500b1f9c460aca037fe1fb7195e4ab70c1f",
+      "size": 861,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/package.xml",
+      "sha256": "89ce763fa4360bc83910976ecf560e954adc348dc7a4d1cf315f149136919e6d",
+      "size": 2686,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/src/ls01b.cpp",
+      "sha256": "b57966c7fcf2ae57d0af9b24acad81d47962cb3c2cc2d62fb403e5756bd21263",
+      "size": 8176,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/src/ls01b_node.cpp",
+      "sha256": "ff0d932dd7a287dd9eec1a41ce00cc9fb0ac7d7bd135b984c2ff4dffd8e3cb1d",
+      "size": 4804,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/src/lsiosr.cpp",
+      "sha256": "66c85a764f104012f6f0fe59e84202c83f921c5ca8211b06b4f4a4288fc19556",
+      "size": 7675,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b.h",
+      "sha256": "8ad194c522f98e3907b96b2e151603ffad3be67e6f120274e6f33547f85bec1b",
+      "size": 2916,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b_node.h",
+      "sha256": "a9095206ebe040d8e9de75a848b05247e8bb39a00cde09d3a3460c459a0d7127",
+      "size": 1324,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/include/ls01b_v2/lsiosr.h",
+      "sha256": "cc944d2830718f358d99ddac52aaa962605af8d93c1bf23a8cabeaaf89cb4244",
+      "size": 1865,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/leishen_ws/src/ls01b_v2/launch/ls01b_v2.launch",
+      "sha256": "47ef5464fec0913abb97ab0502e040b15b773c81bb8a7eee96cd890dc6b76376",
+      "size": 1978,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/cam_test_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/.gitignore",
+      "sha256": "6bccb686b36ffc1c40e2bfa9dc411a8ee5f71a777c49a938258db64eac085a62",
+      "size": 29,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/.travis.yml",
+      "sha256": "b1962c82c01da70657c52e9066d8cb8324c8a43c4ceb5f8fd5ec1262945ff6d8",
+      "size": 1928,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/AUTHORS.md",
+      "sha256": "992ec1274ded7c02a1eb72351663387a3ad11a768918a3ff94d0bb95a83f4661",
+      "size": 181,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/CHANGELOG.rst",
+      "sha256": "1ec793406f9147d44b4c8e7193fae5a1149d0a17828779511b79c3d1bd630082",
+      "size": 14119,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/CMakeLists.txt",
+      "sha256": "69828c54826432ee3a35ab4fd06ebf3c17f6dce0d1adb46fcd5f4bf854dca1bb",
+      "size": 2038,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/LICENSE",
+      "sha256": "e933a42761433025973ededd034740096fa523f0019049b2c55678e0dfad5ffd",
+      "size": 1546,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/README.md",
+      "sha256": "88f808880275a140abf85b77298f2e488240e9d367e298b6b99b0a5cebad729b",
+      "size": 611,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/mainpage.dox",
+      "sha256": "191de3cb0e71381447a57f176889b31ab54d779f3884d0d8754724f3a8e939fc",
+      "size": 66,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/package.xml",
+      "sha256": "c1e0eac96e355aae48231d30a90023dc8e3668df5f16e12f3c2121f4d8a37e43",
+      "size": 1271,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/src/LICENSE",
+      "sha256": "d3ac21131bc4bd5f5a369bf3824d29a80626386b6af6cb1db4aba9bdb8bb72d0",
+      "size": 819,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/src/usb_cam.cpp",
+      "sha256": "818c99c0ecb5e958f296108d29518c329d71ebb652e04689206bd366dd189b9e",
+      "size": 29951,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/include/usb_cam/usb_cam.h",
+      "sha256": "61ee8a48650d33ab148a3abcf1b7814448f4655a1c5fd66322b66888bf4443b2",
+      "size": 4524,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/nodes/usb_cam_node.cpp",
+      "sha256": "1b2a258ba2958d1176b327bca534fe93cd0cd29a45a432967a58c7e5bd6aee6e",
+      "size": 8774,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/launch/usb_cam-1.launch",
+      "sha256": "fdea7f652b18bfb86726ee24ce02e2b1bb9a11bc67f71a001b36ad8c9f5fc9fb",
+      "size": 638,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/launch/usb_cam-2.launch",
+      "sha256": "d81ec4bf98fdd9d939061cd3fa50236d5bed44fc151047ce87cc47bf12316198",
+      "size": 638,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/cam_test_ws/src/usb_cam/launch/usb_cam.launch",
+      "sha256": "c430d233960a8a6c841df5832cf1066d3703bbb9055754d9ac3a69bd03dcd619",
+      "size": 160,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/CMakeLists.txt",
+      "sha256": "e5cd84772bb61f0f70231d6329115500b1f9c460aca037fe1fb7195e4ab70c1f",
+      "size": 861,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/package.xml",
+      "sha256": "89ce763fa4360bc83910976ecf560e954adc348dc7a4d1cf315f149136919e6d",
+      "size": 2686,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/src/ls01b.cpp",
+      "sha256": "b57966c7fcf2ae57d0af9b24acad81d47962cb3c2cc2d62fb403e5756bd21263",
+      "size": 8176,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/src/ls01b_node.cpp",
+      "sha256": "ff0d932dd7a287dd9eec1a41ce00cc9fb0ac7d7bd135b984c2ff4dffd8e3cb1d",
+      "size": 4804,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/src/lsiosr.cpp",
+      "sha256": "66c85a764f104012f6f0fe59e84202c83f921c5ca8211b06b4f4a4288fc19556",
+      "size": 7675,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b.h",
+      "sha256": "8ad194c522f98e3907b96b2e151603ffad3be67e6f120274e6f33547f85bec1b",
+      "size": 2916,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b_node.h",
+      "sha256": "a9095206ebe040d8e9de75a848b05247e8bb39a00cde09d3a3460c459a0d7127",
+      "size": 1324,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/include/ls01b_v2/lsiosr.h",
+      "sha256": "cc944d2830718f358d99ddac52aaa962605af8d93c1bf23a8cabeaaf89cb4244",
+      "size": 1865,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/leishen_ws/src/ls01b_v2/launch/ls01b_v2.launch",
+      "sha256": "47ef5464fec0913abb97ab0502e040b15b773c81bb8a7eee96cd890dc6b76376",
+      "size": 1978,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config origal/teleop/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/CHANGELOG.rst",
+      "sha256": "c63aa5c83c41d839feeb1ff20a7216caa0ddea0cd731f6b7f0ae6eaa1105cf54",
+      "size": 1555,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/CMakeLists.txt",
+      "sha256": "78db3a14ad13409a9f39f07c3fde43b8380116847dfc82965c10117ecd02219b",
+      "size": 347,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/README.md",
+      "sha256": "057bc33207d0aee30ec0f1661bfaa2e2b91695918797d1376e18ef77ec4318c7",
+      "size": 1873,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/package.xml",
+      "sha256": "7b23547dd0f2d571b988acccb77f21186ead464e88ded992d153c1e907347ffb",
+      "size": 505,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/teleop_twist_keyboard (copy).py",
+      "sha256": "2640131cdca519b7e8b6efb5bc1977fb2cc7a2bfd41682124b9c0b73f74a1787",
+      "size": 5830,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/teleop_twist_keyboard/teleop_twist_keyboard.py",
+      "sha256": "2640131cdca519b7e8b6efb5bc1977fb2cc7a2bfd41682124b9c0b73f74a1787",
+      "size": 5830,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/.gitignore",
+      "sha256": "e4360df8ef9a539f076c291a7df08698315778fa391d20d57be8fef80986f0cb",
+      "size": 702,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/CMakeLists.txt",
+      "sha256": "a3cec4736b537837946587a93de21b3226451d9edfa757c15b45b3e4d63d7fd3",
+      "size": 364,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/LICENSE",
+      "sha256": "97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b",
+      "size": 7652,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/README.md",
+      "sha256": "16ad283be7745ad867ae38825f257a48559bc27b81c515b3ff97f84cac5ad71e",
+      "size": 1525,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/package.xml",
+      "sha256": "198ca7ade857a39bacbd3a7426302b0cab6d16ae7f275fd0dd6b100a0c88b42d",
+      "size": 470,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/scripts/joyop.py",
+      "sha256": "b25d4b0d82809191221094dfd33e1f884754a63d25d4603f29a2d8d1510a3ed9",
+      "size": 2466,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/scripts/keyop.py",
+      "sha256": "7563842912af852ba43b51fcf45416e31e0266adc5f7771e4dd7fac071a3a9f7",
+      "size": 4756,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/ackermann-drive-teleop-master/launch/ackermann_drive_joyop.launch",
+      "sha256": "26422eafdc8b4accd13de385d227966de6de20e707bf56a4059031f708edd50b",
+      "size": 446,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/CMakeLists.txt",
+      "sha256": "4b24909327b25b57f666b8a722cb7a808c9ba09c503a48d99379cab8ad3c7ee6",
+      "size": 6900,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/package.xml",
+      "sha256": "a327d5a5f8e0745de95430e6408619128ee6e96b63d709759a110bfc172c49f7",
+      "size": 3214,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/go.png",
+      "sha256": "ab738af791c190678c779b8c400172d4cee739064d92558720326d07b205a70d",
+      "size": 6201,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/lane_detect.py",
+      "sha256": "b5a09e7914cb60df0b0152d56362ac80ef210728df3fcb7eb9942021ba92ab6b",
+      "size": 28079,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/st.png",
+      "sha256": "d088d4317dd8d8821e0e4fe4f8413359dae1af82470e867e1470d57e62241645",
+      "size": 10512,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/stop_obj_avo.py",
+      "sha256": "77312140c27794b330d657b0d911020dbbde263a93b2b76e1894abc1f80f581c",
+      "size": 67577,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/tb.png",
+      "sha256": "0ae346daa36b8da2dff5b037fb2535c11bbaa81687f32aaf3de2854ab1311b98",
+      "size": 8805,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/tl.png",
+      "sha256": "70bf4a2ebad277e143311b1b394e5488635358b4554cbc6f35e055391221dbf5",
+      "size": 5690,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/scripts/tr.png",
+      "sha256": "b7c2e22062be58cfab76490a9648c091eb0a76e9a5aa08989db691e40e8c82ef",
+      "size": 5666,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/msg/aimPoint.msg",
+      "sha256": "e1423e5023ad5e2abefa8c7e217d9c2130b069a9595e0ff9aaa0f996db7aec4f",
+      "size": 20,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/msg/laser_control.msg",
+      "sha256": "9c4230e6b6f49004f975d36b1d11bef0a602f4f78235cba0e74711da34e5197d",
+      "size": 23,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/msg/light.msg",
+      "sha256": "3b05e979e3090358699eb1d30e54370070a69f6ddeed2af81b0c2b8a29c4ebf4",
+      "size": 44,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/smartcar/msg/remember.msg",
+      "sha256": "bb0860bec3807d506f855db0c7e96dddcbb168d2b418d4cd65d4314336d2c2a1",
+      "size": 15,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/laser_test/CMakeLists.txt",
+      "sha256": "4c943f9362acd23499bb02c34c4f5d9601f444534826a5195a31eaf58cb01770",
+      "size": 7442,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/laser_test/laser_test.cpp",
+      "sha256": "1f27bf714b48345bbb7c7806e3a42091b5ef8aa71827d530e4f67e428c9371c4",
+      "size": 6070,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/laser_test/package.xml",
+      "sha256": "c871b5a24752249ebe03677b5862be579ad06ad3864cb49dc04232edde969c3a",
+      "size": 2985,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/laser_test/msg/aimPose.msg",
+      "sha256": "042ceb95a33d7d9c22c5ac4263178b6f7ab7a2b8abc33eff1bc7772449895329",
+      "size": 34,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/laser_test/msg/laser_control.msg",
+      "sha256": "9c4230e6b6f49004f975d36b1d11bef0a602f4f78235cba0e74711da34e5197d",
+      "size": 23,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/base_controller/CMakeLists.txt",
+      "sha256": "e9b567ad4ee583bfe7a47b0d2440d8bdadebdce047498f3028495b4e80d34799",
+      "size": 7234,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/base_controller/package.xml",
+      "sha256": "ff747ac2332fe07d959569c7b0cf3284109a5ce1ffb9a603ddbce6807f1124f6",
+      "size": 2884,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/base_controller/src/base_controller.cpp",
+      "sha256": "251ecf1a939579c1653427c026e9cc695566b2a771bca109e20239f4a7fedaec",
+      "size": 3458,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/.gitignore",
+      "sha256": "d79d66d36ad3853ed3c9c2ff5b0e7fb10b17896c4b03dfae0c105e85e5faf7b5",
+      "size": 249,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/.travis.yml",
+      "sha256": "2bb9204b8e72fd48c3a1611589767220b5ab68901fc3bab9d43453006041f13c",
+      "size": 240,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/CHANGELOG.rst",
+      "sha256": "bc4a3c5f804607525a4c816ba69d20899268a3674a4ce12159e052129d730bf5",
+      "size": 3833,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/CMakeLists.txt",
+      "sha256": "ee91b45e371df70357bf07e4237d87b0eda618e04bcc91200090cdd1f2fa4e77",
+      "size": 2073,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/Makefile",
+      "sha256": "fa36fbe6c325c0cbd80ef01db297b302bb872d60ce64841eed56106d43a5587b",
+      "size": 1686,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/README.md",
+      "sha256": "8f225017344f94711416c140ec9befc33d899379ae18c1d6d60357d3466079b6",
+      "size": 3272,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/changes.txt",
+      "sha256": "450d028395199eb82cd5b14685a553991ee802910059d369ad8306aaa5a681e6",
+      "size": 259,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/package.xml",
+      "sha256": "e8f9a396d8de48dd50beb28e431ffcd60497c6a39cf2ba21c92a03e356b58efc",
+      "size": 851,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/serial.sublime-project",
+      "sha256": "94110a45dbc09d838e45038538e349d8f7c9a17eba77d87f110b90374503c6be",
+      "size": 575,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/doc/Doxyfile",
+      "sha256": "722e7c765efb938c1d934d4805883cca95977180b0368af097b14419edca6787",
+      "size": 106335,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/doc/serial.dox",
+      "sha256": "db8d2379280c40dd93485e0a1febb960a6a36c5ce4093d3e7f840a32c9f6ca0b",
+      "size": 1734,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/serial.cc",
+      "sha256": "7702b646a57e8257db057272773f6a8e54b396a7d09b3d98a01040aa1cee805c",
+      "size": 8381,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/impl/unix.cc",
+      "sha256": "afdc2b157831400116c45ed879f0eaaad450925ee0a15a2f033e362baecf11d2",
+      "size": 26194,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/impl/win.cc",
+      "sha256": "c2a1e36c1f25aa82e9c5242c0263941a93de664f60d48dbbec12c3ce7d1d9704",
+      "size": 15057,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/impl/list_ports/list_ports_linux.cc",
+      "sha256": "f67417b8ba5fd2718f9a14d705f4f939132700f0a43ae647e9c58559681b4694",
+      "size": 7242,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/impl/list_ports/list_ports_osx.cc",
+      "sha256": "19665d16a5bba094206f746f91811632abacad4f5bbe41232c9bcfe30731af79",
+      "size": 7202,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/src/impl/list_ports/list_ports_win.cc",
+      "sha256": "ddf2bda16022f97b64fa5170545a22a48da5c675f8e09e5863ec3897cd80e4bc",
+      "size": 3718,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/examples/serial_example.cc",
+      "sha256": "1ca7a8486c0fd84d46e1591783cab4504cbd5882132f355555d23a063caa895a",
+      "size": 4282,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/visual_studio/visual_studio.sln",
+      "sha256": "f9d9376765b77d87a39654a9368fd9dc9bc970140a1a3bb347ffda1d25de1ab1",
+      "size": 1975,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/visual_studio/serial/serial.vcxproj",
+      "sha256": "89e27bac6e3d4f7d705e6c2d7cccb17479524246c666cf6379910f30ecaaf2c0",
+      "size": 7338,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/visual_studio/serial/serial.vcxproj.filters",
+      "sha256": "786e9900aa4bd601fe6299fe7d05b37c9d184c3b3557a9cc1c960182e50e02d0",
+      "size": 1527,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/visual_studio/test_serial/test_serial.vcxproj",
+      "sha256": "bc42c3717fa541536408b656e18afc5ebe35dffc6544c5923dd331e284980653",
+      "size": 6606,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/visual_studio/test_serial/test_serial.vcxproj.filters",
+      "sha256": "0a1d0d77d5cbe4dc609ea2b6fbffce3588c95556ad761e243259308a04911699",
+      "size": 956,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/include/serial/serial.h",
+      "sha256": "f4dcb008056f41fbb80357da817959e8cf5e2f6d04fb79a416b4fedd68a8a0d7",
+      "size": 23702,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/include/serial/v8stdint.h",
+      "sha256": "d1155ad61ee6583c90ce3abb174239fbb677627e8220fb8518c8d5e4d3d16e5d",
+      "size": 2257,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/include/serial/impl/unix.h",
+      "sha256": "b5fb6fe5dc66aa262c4fcd602c677938bf9a65ddc2010c7b022c7aade1f36bc6",
+      "size": 4312,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/include/serial/impl/win.h",
+      "sha256": "416e11faeaae7df28f47e801a58cb1d9ac78d7413a43cb70830a2d1271a889fc",
+      "size": 3899,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/CMakeLists.txt",
+      "sha256": "79e952259b9730d9ae24014d37d6f9867fa4933952a69e7890403a0325711741",
+      "size": 469,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/unix_serial_tests.cc",
+      "sha256": "8df8064e2302c5b5f87c0afde7441e0ef86cf8f94e6d61c44ac98e91846470b8",
+      "size": 2459,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/unit/unix_timer_tests.cc",
+      "sha256": "e96b1a157bfb7db5f83dfc0ed0337bfe8edbb95bf5a3df0051fffb1de9f7ffa6",
+      "size": 1447,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/proof_of_concepts/mdc2250.cc",
+      "sha256": "89a2edb1b8717fb51f483b50aeb0406ccb7c9103bb741edf96aa84a3d012e99b",
+      "size": 11,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/proof_of_concepts/python_serial_test.py",
+      "sha256": "9c461360239e339b27dc5abfe396a6abe07294a6d0e677cdcc1e13b6f403eda3",
+      "size": 273,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/teleop/src/serial/tests/proof_of_concepts/tokenizer.cc",
+      "sha256": "8a710c19f3a60019eb70706f5bd955d0d19c87d560a62ab41c58261e1c9e35ef",
+      "size": 769,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/.gitignore",
+      "sha256": "6bccb686b36ffc1c40e2bfa9dc411a8ee5f71a777c49a938258db64eac085a62",
+      "size": 29,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/.travis.yml",
+      "sha256": "b1962c82c01da70657c52e9066d8cb8324c8a43c4ceb5f8fd5ec1262945ff6d8",
+      "size": 1928,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/AUTHORS.md",
+      "sha256": "992ec1274ded7c02a1eb72351663387a3ad11a768918a3ff94d0bb95a83f4661",
+      "size": 181,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/CHANGELOG.rst",
+      "sha256": "1ec793406f9147d44b4c8e7193fae5a1149d0a17828779511b79c3d1bd630082",
+      "size": 14119,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/CMakeLists.txt",
+      "sha256": "69828c54826432ee3a35ab4fd06ebf3c17f6dce0d1adb46fcd5f4bf854dca1bb",
+      "size": 2038,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/LICENSE",
+      "sha256": "e933a42761433025973ededd034740096fa523f0019049b2c55678e0dfad5ffd",
+      "size": 1546,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/README.md",
+      "sha256": "88f808880275a140abf85b77298f2e488240e9d367e298b6b99b0a5cebad729b",
+      "size": 611,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/mainpage.dox",
+      "sha256": "191de3cb0e71381447a57f176889b31ab54d779f3884d0d8754724f3a8e939fc",
+      "size": 66,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/package.xml",
+      "sha256": "c1e0eac96e355aae48231d30a90023dc8e3668df5f16e12f3c2121f4d8a37e43",
+      "size": 1271,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/src/LICENSE",
+      "sha256": "d3ac21131bc4bd5f5a369bf3824d29a80626386b6af6cb1db4aba9bdb8bb72d0",
+      "size": 819,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/src/usb_cam.cpp",
+      "sha256": "818c99c0ecb5e958f296108d29518c329d71ebb652e04689206bd366dd189b9e",
+      "size": 29951,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/include/usb_cam/usb_cam.h",
+      "sha256": "61ee8a48650d33ab148a3abcf1b7814448f4655a1c5fd66322b66888bf4443b2",
+      "size": 4524,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/nodes/usb_cam_node.cpp",
+      "sha256": "1b2a258ba2958d1176b327bca534fe93cd0cd29a45a432967a58c7e5bd6aee6e",
+      "size": 8774,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/launch/usb_cam-1.launch",
+      "sha256": "fdea7f652b18bfb86726ee24ce02e2b1bb9a11bc67f71a001b36ad8c9f5fc9fb",
+      "size": 638,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/launch/usb_cam-2.launch",
+      "sha256": "d81ec4bf98fdd9d939061cd3fa50236d5bed44fc151047ce87cc47bf12316198",
+      "size": 638,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config origal/cam_test_ws/src/usb_cam/launch/usb_cam.launch",
+      "sha256": "c430d233960a8a6c841df5832cf1066d3703bbb9055754d9ac3a69bd03dcd619",
+      "size": 160,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/CMakeLists.txt",
+      "sha256": "e5cd84772bb61f0f70231d6329115500b1f9c460aca037fe1fb7195e4ab70c1f",
+      "size": 861,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/package.xml",
+      "sha256": "89ce763fa4360bc83910976ecf560e954adc348dc7a4d1cf315f149136919e6d",
+      "size": 2686,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/src/ls01b.cpp",
+      "sha256": "b57966c7fcf2ae57d0af9b24acad81d47962cb3c2cc2d62fb403e5756bd21263",
+      "size": 8176,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/src/ls01b_node.cpp",
+      "sha256": "ff0d932dd7a287dd9eec1a41ce00cc9fb0ac7d7bd135b984c2ff4dffd8e3cb1d",
+      "size": 4804,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/src/lsiosr.cpp",
+      "sha256": "66c85a764f104012f6f0fe59e84202c83f921c5ca8211b06b4f4a4288fc19556",
+      "size": 7675,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b.h",
+      "sha256": "8ad194c522f98e3907b96b2e151603ffad3be67e6f120274e6f33547f85bec1b",
+      "size": 2916,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/include/ls01b_v2/ls01b_node.h",
+      "sha256": "a9095206ebe040d8e9de75a848b05247e8bb39a00cde09d3a3460c459a0d7127",
+      "size": 1324,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/include/ls01b_v2/lsiosr.h",
+      "sha256": "cc944d2830718f358d99ddac52aaa962605af8d93c1bf23a8cabeaaf89cb4244",
+      "size": 1865,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/leishen_ws/src/ls01b_v2/launch/ls01b_v2.launch",
+      "sha256": "47ef5464fec0913abb97ab0502e040b15b773c81bb8a7eee96cd890dc6b76376",
+      "size": 1978,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config/teleop/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/CHANGELOG.rst",
+      "sha256": "c63aa5c83c41d839feeb1ff20a7216caa0ddea0cd731f6b7f0ae6eaa1105cf54",
+      "size": 1555,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/CMakeLists.txt",
+      "sha256": "78db3a14ad13409a9f39f07c3fde43b8380116847dfc82965c10117ecd02219b",
+      "size": 347,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/README.md",
+      "sha256": "057bc33207d0aee30ec0f1661bfaa2e2b91695918797d1376e18ef77ec4318c7",
+      "size": 1873,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/package.xml",
+      "sha256": "7b23547dd0f2d571b988acccb77f21186ead464e88ded992d153c1e907347ffb",
+      "size": 505,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/teleop_twist_keyboard (copy).py",
+      "sha256": "2640131cdca519b7e8b6efb5bc1977fb2cc7a2bfd41682124b9c0b73f74a1787",
+      "size": 5830,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/teleop_twist_keyboard/teleop_twist_keyboard.py",
+      "sha256": "2640131cdca519b7e8b6efb5bc1977fb2cc7a2bfd41682124b9c0b73f74a1787",
+      "size": 5830,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/.gitignore",
+      "sha256": "6bccb686b36ffc1c40e2bfa9dc411a8ee5f71a777c49a938258db64eac085a62",
+      "size": 29,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/.travis.yml",
+      "sha256": "b1962c82c01da70657c52e9066d8cb8324c8a43c4ceb5f8fd5ec1262945ff6d8",
+      "size": 1928,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/AUTHORS.md",
+      "sha256": "992ec1274ded7c02a1eb72351663387a3ad11a768918a3ff94d0bb95a83f4661",
+      "size": 181,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/CHANGELOG.rst",
+      "sha256": "1ec793406f9147d44b4c8e7193fae5a1149d0a17828779511b79c3d1bd630082",
+      "size": 14119,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/CMakeLists.txt",
+      "sha256": "69828c54826432ee3a35ab4fd06ebf3c17f6dce0d1adb46fcd5f4bf854dca1bb",
+      "size": 2038,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/LICENSE",
+      "sha256": "e933a42761433025973ededd034740096fa523f0019049b2c55678e0dfad5ffd",
+      "size": 1546,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/README.md",
+      "sha256": "88f808880275a140abf85b77298f2e488240e9d367e298b6b99b0a5cebad729b",
+      "size": 611,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/mainpage.dox",
+      "sha256": "191de3cb0e71381447a57f176889b31ab54d779f3884d0d8754724f3a8e939fc",
+      "size": 66,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/package.xml",
+      "sha256": "c1e0eac96e355aae48231d30a90023dc8e3668df5f16e12f3c2121f4d8a37e43",
+      "size": 1271,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/src/LICENSE",
+      "sha256": "d3ac21131bc4bd5f5a369bf3824d29a80626386b6af6cb1db4aba9bdb8bb72d0",
+      "size": 819,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/src/usb_cam.cpp",
+      "sha256": "818c99c0ecb5e958f296108d29518c329d71ebb652e04689206bd366dd189b9e",
+      "size": 29951,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/include/usb_cam/usb_cam.h",
+      "sha256": "61ee8a48650d33ab148a3abcf1b7814448f4655a1c5fd66322b66888bf4443b2",
+      "size": 4524,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/nodes/usb_cam_node.cpp",
+      "sha256": "b7252735b00854e74ed1d801493db19c8081e2eef20da8ae4f70bc9f48b77fd1",
+      "size": 8586,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/usb_cam/launch/usb_cam-test.launch",
+      "sha256": "e3b3ba0e770b8939cbb595038e199850bbcdbcccd8fdb3d1949512f5a034e770",
+      "size": 589,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/.gitignore",
+      "sha256": "e4360df8ef9a539f076c291a7df08698315778fa391d20d57be8fef80986f0cb",
+      "size": 702,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/CMakeLists.txt",
+      "sha256": "a3cec4736b537837946587a93de21b3226451d9edfa757c15b45b3e4d63d7fd3",
+      "size": 364,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/LICENSE",
+      "sha256": "97628afebc60f026f5c2b25d7491c46a5c4ee61f693e7cfa07fbd2c03605979b",
+      "size": 7652,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/README.md",
+      "sha256": "16ad283be7745ad867ae38825f257a48559bc27b81c515b3ff97f84cac5ad71e",
+      "size": 1525,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/package.xml",
+      "sha256": "198ca7ade857a39bacbd3a7426302b0cab6d16ae7f275fd0dd6b100a0c88b42d",
+      "size": 470,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/scripts/joyop.py",
+      "sha256": "b25d4b0d82809191221094dfd33e1f884754a63d25d4603f29a2d8d1510a3ed9",
+      "size": 2466,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/scripts/keyop.py",
+      "sha256": "254fb89cf271f5ecef017f09a152a65b1c69251ef19e8c45716b6ebb5b0b5e0b",
+      "size": 4828,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/ackermann-drive-teleop-master/launch/ackermann_drive_joyop.launch",
+      "sha256": "26422eafdc8b4accd13de385d227966de6de20e707bf56a4059031f708edd50b",
+      "size": 446,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/CMakeLists.txt",
+      "sha256": "4b24909327b25b57f666b8a722cb7a808c9ba09c503a48d99379cab8ad3c7ee6",
+      "size": 6900,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/package.xml",
+      "sha256": "a327d5a5f8e0745de95430e6408619128ee6e96b63d709759a110bfc172c49f7",
+      "size": 3214,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/0.jpg",
+      "sha256": "ce998a9d96b392d100ef67e56f289ca72b4070f74f013bb4efcfdc092b5bb0ee",
+      "size": 28672,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/000.jpg",
+      "sha256": "36521429949c38a2471817d498dccbe29f94d786a312f8ece408df52c34feb28",
+      "size": 93900,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/001.jpg",
+      "sha256": "f9bfbcc144a77ddf71c73428a28b37bf55881f97f58c2c056ef0d3fda9557c90",
+      "size": 29829,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/002.jpg",
+      "sha256": "05edc25cf4f35dabe21434fce40c3bc81ef5a0cda5c6627ada8601ca8ad9066d",
+      "size": 13842,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/003.jpg",
+      "sha256": "87b0a931164b0fcfdf5113159c9e4b7166e066a2bd3085a5d5005bf745ba0cf4",
+      "size": 92607,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/004.jpg",
+      "sha256": "6c656b14f23d9f7c725405a7ef820b42fbc45d7bfd14fa21a6123231b79ddf87",
+      "size": 8989,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/005.jpg",
+      "sha256": "116de1fe9482a09c8a317e68d5c3a9ae28ff41c3d6aeebd6bc52d141e101b03c",
+      "size": 91150,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/123.jpg",
+      "sha256": "efc54c1ff83da9ffd0ed524019564cd90ffd590edff909349f550dbee8567f3b",
+      "size": 34051,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd.py",
+      "sha256": "77e0e9b3f465dc4e6a42b3755b4669f33664f8f3160a86155fcb7b167cfdc249",
+      "size": 38270,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd1.py",
+      "sha256": "0b86fc319dd0e74120d727e26530c2f2ded90d835d8b26ebc97809ea094d1de5",
+      "size": 38341,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd2.py",
+      "sha256": "96a044846e8e5c45bf7ef8eef6b03d018f53e299ffe187c7455af0fefc7f11ab",
+      "size": 23809,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/camera_cmd__.py",
+      "sha256": "25d5a9d6056cec3b17db1421e2f8337a7b00565419d0349b1cebbe481c86b3ae",
+      "size": 38428,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/cmdcore_0606.py",
+      "sha256": "8a3736edf67fd535971f7c8f9c2ee8a7118ce34e2cc1efe0a95f21feb6bd5b73",
+      "size": 25046,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/code.txt",
+      "sha256": "39df1929701ea7f0221c5a0bc203d921dbede0ba4a70c0d6ad1560e9a64711e9",
+      "size": 16767,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/go.png",
+      "sha256": "ab738af791c190678c779b8c400172d4cee739064d92558720326d07b205a70d",
+      "size": 6201,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/history.py",
+      "sha256": "f419e9382a45bf9795121a3f83ee5231c61d7d76517d6148d930d0450bc6dbe9",
+      "size": 18645,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/integration.py~",
+      "sha256": "97b8b08eea79f8f19bcb59f3027105e3a952a8a6f0bf9b05300f1ddf1c0c15a0",
+      "size": 10317,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/labels.txt",
+      "sha256": "4f44528ef51e515309370ef9abcf2a886ecd28eeabc7062cf092453bdb0904ef",
+      "size": 10,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/lane_detect.py",
+      "sha256": "d9db0c93e7bea7fe69b8e65290df03c1bbfea780321467e509a4bc2f01f19ee4",
+      "size": 28124,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/st.png",
+      "sha256": "d088d4317dd8d8821e0e4fe4f8413359dae1af82470e867e1470d57e62241645",
+      "size": 10512,
+      "type": "file"
+    },
+    {
+      "mode": "100755",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/stop_obj_avo.py",
+      "sha256": "b3ecdc4a7782e21f70a8681540586e426351eb3abad3101f3dfaad312660db2c",
+      "size": 66257,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/tb.png",
+      "sha256": "0ae346daa36b8da2dff5b037fb2535c11bbaa81687f32aaf3de2854ab1311b98",
+      "size": 8805,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/tl.png",
+      "sha256": "70bf4a2ebad277e143311b1b394e5488635358b4554cbc6f35e055391221dbf5",
+      "size": 5690,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/scripts/tr.png",
+      "sha256": "b7c2e22062be58cfab76490a9648c091eb0a76e9a5aa08989db691e40e8c82ef",
+      "size": 5666,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/msg/aimPoint.msg",
+      "sha256": "e1423e5023ad5e2abefa8c7e217d9c2130b069a9595e0ff9aaa0f996db7aec4f",
+      "size": 20,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/msg/laser_control.msg",
+      "sha256": "9c4230e6b6f49004f975d36b1d11bef0a602f4f78235cba0e74711da34e5197d",
+      "size": 23,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/msg/light.msg",
+      "sha256": "3b05e979e3090358699eb1d30e54370070a69f6ddeed2af81b0c2b8a29c4ebf4",
+      "size": 44,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/smartcar/msg/remember.msg",
+      "sha256": "bb0860bec3807d506f855db0c7e96dddcbb168d2b418d4cd65d4314336d2c2a1",
+      "size": 15,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/laser_test/CMakeLists.txt",
+      "sha256": "c7bd5f95dc90dea36d6dc4da4ee992bf3d585cf3645e6ad3a3104de1474ac2de",
+      "size": 7507,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/laser_test/laser_test.cpp",
+      "sha256": "c3b150459acf1354f6299ea0ea65f593cf16c4c1b1210f655720f2b9ff37281e",
+      "size": 5551,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/laser_test/package.xml",
+      "sha256": "c871b5a24752249ebe03677b5862be579ad06ad3864cb49dc04232edde969c3a",
+      "size": 2985,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/laser_test/msg/aimPose.msg",
+      "sha256": "042ceb95a33d7d9c22c5ac4263178b6f7ab7a2b8abc33eff1bc7772449895329",
+      "size": 34,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/laser_test/msg/laser_control.msg",
+      "sha256": "9c4230e6b6f49004f975d36b1d11bef0a602f4f78235cba0e74711da34e5197d",
+      "size": 23,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/base_controller/CMakeLists.txt",
+      "sha256": "e9b567ad4ee583bfe7a47b0d2440d8bdadebdce047498f3028495b4e80d34799",
+      "size": 7234,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/base_controller/package.xml",
+      "sha256": "ff747ac2332fe07d959569c7b0cf3284109a5ce1ffb9a603ddbce6807f1124f6",
+      "size": 2884,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/base_controller/src/base_controller.cpp",
+      "sha256": "ba0a79857c02cda79be3e93a0a5c97186c33a7be2c9a49bba553e3655b15f953",
+      "size": 4869,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/base_controller/launch/keyboard_drive.launch",
+      "sha256": "738a3d04f2e27331b1f867609945fb5a2a583b5e399c02df550eb83dada08267",
+      "size": 406,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/.gitignore",
+      "sha256": "d79d66d36ad3853ed3c9c2ff5b0e7fb10b17896c4b03dfae0c105e85e5faf7b5",
+      "size": 249,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/.travis.yml",
+      "sha256": "2bb9204b8e72fd48c3a1611589767220b5ab68901fc3bab9d43453006041f13c",
+      "size": 240,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/CHANGELOG.rst",
+      "sha256": "bc4a3c5f804607525a4c816ba69d20899268a3674a4ce12159e052129d730bf5",
+      "size": 3833,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/CMakeLists.txt",
+      "sha256": "ee91b45e371df70357bf07e4237d87b0eda618e04bcc91200090cdd1f2fa4e77",
+      "size": 2073,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/Makefile",
+      "sha256": "fa36fbe6c325c0cbd80ef01db297b302bb872d60ce64841eed56106d43a5587b",
+      "size": 1686,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/README.md",
+      "sha256": "8f225017344f94711416c140ec9befc33d899379ae18c1d6d60357d3466079b6",
+      "size": 3272,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/changes.txt",
+      "sha256": "450d028395199eb82cd5b14685a553991ee802910059d369ad8306aaa5a681e6",
+      "size": 259,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/package.xml",
+      "sha256": "e8f9a396d8de48dd50beb28e431ffcd60497c6a39cf2ba21c92a03e356b58efc",
+      "size": 851,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/serial.sublime-project",
+      "sha256": "94110a45dbc09d838e45038538e349d8f7c9a17eba77d87f110b90374503c6be",
+      "size": 575,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/doc/Doxyfile",
+      "sha256": "722e7c765efb938c1d934d4805883cca95977180b0368af097b14419edca6787",
+      "size": 106335,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/doc/serial.dox",
+      "sha256": "db8d2379280c40dd93485e0a1febb960a6a36c5ce4093d3e7f840a32c9f6ca0b",
+      "size": 1734,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/serial.cc",
+      "sha256": "7702b646a57e8257db057272773f6a8e54b396a7d09b3d98a01040aa1cee805c",
+      "size": 8381,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/impl/unix.cc",
+      "sha256": "afdc2b157831400116c45ed879f0eaaad450925ee0a15a2f033e362baecf11d2",
+      "size": 26194,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/impl/win.cc",
+      "sha256": "c2a1e36c1f25aa82e9c5242c0263941a93de664f60d48dbbec12c3ce7d1d9704",
+      "size": 15057,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/impl/list_ports/list_ports_linux.cc",
+      "sha256": "f67417b8ba5fd2718f9a14d705f4f939132700f0a43ae647e9c58559681b4694",
+      "size": 7242,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/impl/list_ports/list_ports_osx.cc",
+      "sha256": "19665d16a5bba094206f746f91811632abacad4f5bbe41232c9bcfe30731af79",
+      "size": 7202,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/src/impl/list_ports/list_ports_win.cc",
+      "sha256": "ddf2bda16022f97b64fa5170545a22a48da5c675f8e09e5863ec3897cd80e4bc",
+      "size": 3718,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/examples/serial_example.cc",
+      "sha256": "1ca7a8486c0fd84d46e1591783cab4504cbd5882132f355555d23a063caa895a",
+      "size": 4282,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/visual_studio/visual_studio.sln",
+      "sha256": "f9d9376765b77d87a39654a9368fd9dc9bc970140a1a3bb347ffda1d25de1ab1",
+      "size": 1975,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/visual_studio/serial/serial.vcxproj",
+      "sha256": "89e27bac6e3d4f7d705e6c2d7cccb17479524246c666cf6379910f30ecaaf2c0",
+      "size": 7338,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/visual_studio/serial/serial.vcxproj.filters",
+      "sha256": "786e9900aa4bd601fe6299fe7d05b37c9d184c3b3557a9cc1c960182e50e02d0",
+      "size": 1527,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/visual_studio/test_serial/test_serial.vcxproj",
+      "sha256": "bc42c3717fa541536408b656e18afc5ebe35dffc6544c5923dd331e284980653",
+      "size": 6606,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/visual_studio/test_serial/test_serial.vcxproj.filters",
+      "sha256": "0a1d0d77d5cbe4dc609ea2b6fbffce3588c95556ad761e243259308a04911699",
+      "size": 956,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/include/serial/serial.h",
+      "sha256": "f4dcb008056f41fbb80357da817959e8cf5e2f6d04fb79a416b4fedd68a8a0d7",
+      "size": 23702,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/include/serial/v8stdint.h",
+      "sha256": "d1155ad61ee6583c90ce3abb174239fbb677627e8220fb8518c8d5e4d3d16e5d",
+      "size": 2257,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/include/serial/impl/unix.h",
+      "sha256": "b5fb6fe5dc66aa262c4fcd602c677938bf9a65ddc2010c7b022c7aade1f36bc6",
+      "size": 4312,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/include/serial/impl/win.h",
+      "sha256": "416e11faeaae7df28f47e801a58cb1d9ac78d7413a43cb70830a2d1271a889fc",
+      "size": 3899,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/CMakeLists.txt",
+      "sha256": "79e952259b9730d9ae24014d37d6f9867fa4933952a69e7890403a0325711741",
+      "size": 469,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/unix_serial_tests.cc",
+      "sha256": "8df8064e2302c5b5f87c0afde7441e0ef86cf8f94e6d61c44ac98e91846470b8",
+      "size": 2459,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/unit/unix_timer_tests.cc",
+      "sha256": "e96b1a157bfb7db5f83dfc0ed0337bfe8edbb95bf5a3df0051fffb1de9f7ffa6",
+      "size": 1447,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/proof_of_concepts/mdc2250.cc",
+      "sha256": "89a2edb1b8717fb51f483b50aeb0406ccb7c9103bb741edf96aa84a3d012e99b",
+      "size": 11,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/proof_of_concepts/python_serial_test.py",
+      "sha256": "9c461360239e339b27dc5abfe396a6abe07294a6d0e677cdcc1e13b6f403eda3",
+      "size": 273,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/teleop/src/serial/tests/proof_of_concepts/tokenizer.cc",
+      "sha256": "8a710c19f3a60019eb70706f5bd955d0d19c87d560a62ab41c58261e1c9e35ef",
+      "size": 769,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/.catkin_workspace",
+      "sha256": "095f6554aab683a09c20a1d4aa28894cfa1133b4173a5ef73c496aeadc792dae",
+      "size": 98,
+      "type": "file"
+    },
+    {
+      "mode": "120000",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/CMakeLists.txt",
+      "sha256": "4d98821d52b02264fe9f22db7ca30f992b36f98f43747dde2056d4142957e08f",
+      "target": "/opt/ros/melodic/share/catkin/cmake/toplevel.cmake",
+      "type": "symlink"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/.gitignore",
+      "sha256": "6bccb686b36ffc1c40e2bfa9dc411a8ee5f71a777c49a938258db64eac085a62",
+      "size": 29,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/.travis.yml",
+      "sha256": "b1962c82c01da70657c52e9066d8cb8324c8a43c4ceb5f8fd5ec1262945ff6d8",
+      "size": 1928,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/AUTHORS.md",
+      "sha256": "992ec1274ded7c02a1eb72351663387a3ad11a768918a3ff94d0bb95a83f4661",
+      "size": 181,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/CHANGELOG.rst",
+      "sha256": "1ec793406f9147d44b4c8e7193fae5a1149d0a17828779511b79c3d1bd630082",
+      "size": 14119,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/CMakeLists.txt",
+      "sha256": "69828c54826432ee3a35ab4fd06ebf3c17f6dce0d1adb46fcd5f4bf854dca1bb",
+      "size": 2038,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/LICENSE",
+      "sha256": "e933a42761433025973ededd034740096fa523f0019049b2c55678e0dfad5ffd",
+      "size": 1546,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/README.md",
+      "sha256": "88f808880275a140abf85b77298f2e488240e9d367e298b6b99b0a5cebad729b",
+      "size": 611,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/mainpage.dox",
+      "sha256": "191de3cb0e71381447a57f176889b31ab54d779f3884d0d8754724f3a8e939fc",
+      "size": 66,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/package.xml",
+      "sha256": "c1e0eac96e355aae48231d30a90023dc8e3668df5f16e12f3c2121f4d8a37e43",
+      "size": 1271,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/src/LICENSE",
+      "sha256": "d3ac21131bc4bd5f5a369bf3824d29a80626386b6af6cb1db4aba9bdb8bb72d0",
+      "size": 819,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/src/usb_cam.cpp",
+      "sha256": "818c99c0ecb5e958f296108d29518c329d71ebb652e04689206bd366dd189b9e",
+      "size": 29951,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/include/usb_cam/usb_cam.h",
+      "sha256": "61ee8a48650d33ab148a3abcf1b7814448f4655a1c5fd66322b66888bf4443b2",
+      "size": 4524,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/nodes/usb_cam_node.cpp",
+      "sha256": "1b2a258ba2958d1176b327bca534fe93cd0cd29a45a432967a58c7e5bd6aee6e",
+      "size": 8774,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/launch/usb_cam-1.launch",
+      "sha256": "eedd17efe7a6907a1ba74aff02d88a0f4f0f4e11b914c7a962fb4247ad25659c",
+      "size": 693,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/launch/usb_cam-2.launch",
+      "sha256": "98a21b655777f7b79629c03c1c1ad33d87e8ac45407d888c073f2b1490425daa",
+      "size": 693,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "newcar_ws/znxc/config/cam_test_ws/src/usb_cam/launch/usb_cam.launch",
+      "sha256": "c430d233960a8a6c841df5832cf1066d3703bbb9055754d9ac3a69bd03dcd619",
+      "size": 160,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923/config.json",
+      "sha256": "01dc13d2f8d70aec8578cd86d237809c8f262b0bb5f0ea4d2a5dd915c63f133b",
+      "size": 526,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923/lane_follow.py",
+      "sha256": "6f18ee5bd52dff6906e06256f26e94af4e6899496590892c98d6609d6171dac9",
+      "size": 13253,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923/lane_vision.py",
+      "sha256": "29577aac3da8c1e84667c5f81f3d7d09211e99327624fa8f574be614e45ffa14",
+      "size": 6882,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923/test_lane.py",
+      "sha256": "2b2844d1df25d5f7b91a370468eab4defe9a7221a26a85c46701881d8fb154a9",
+      "size": 2329,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923_v2/config.json",
+      "sha256": "64298204e52bb48f83ddc40f63af42b7feae04098dcb09e1b2a2307170ea6192",
+      "size": 597,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923_v2/lane_control.py",
+      "sha256": "20a420afef14ffa5909047cf238b10c5b34235a8c52d3a196df4e8401e27cbed",
+      "size": 1708,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923_v2/lane_follow.py",
+      "sha256": "0e8017e4c9fcad5e365338aaf3d55c65f7ee50be346d0b7dc1541f7edfae4045",
+      "size": 14245,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923_v2/lane_vision.py",
+      "sha256": "29577aac3da8c1e84667c5f81f3d7d09211e99327624fa8f574be614e45ffa14",
+      "size": 6882,
+      "type": "file"
+    },
+    {
+      "mode": "100644",
+      "path": "lane_follow_20260923_v2/test_lane.py",
+      "sha256": "c207f38639ef4042d35f6d9e95113a86e039b912d2d1136ede79c1858477263f",
+      "size": 3667,
+      "type": "file"
+    }
+  ],
+  "source_root": "/home/smartcar",
+  "snapshot_utc": "2026-09-25T07:18:14.839925+00:00"
+}
