@@ -1,82 +1,73 @@
 # 小车开发目录与 GitHub 同步
 
-整理日期：2026-09-25；设备：`smartcar-desktop`。
+## 唯一开发入口
 
-## 日常入口
+`/home/smartcar/projects/smart-car` 是车上的 Git 仓库和 Catkin 工作空间。
 
-主 Git 仓库：`/home/smartcar/projects/smart-car`。
+- `src/<包名>/`：所有实际模块源码，模块相关 launch、配置和测试也放在包中。
+- `scripts/`：构建、环境加载、Git 同步和手动试验入口。
+- `output/build/`：CMake 缓存、目标文件及测试结果。
+- `output/devel/`：开发环境、编译后的可执行文件、共享库和消息生成代码。
+- `output/install/`：执行 install 目标时生成的安装结果。
 
-```text
-~/projects/smart-car/
-├── workspaces/
-│   ├── control  -> ../vehicle/newcar_ws/znxc/config/teleop
-│   ├── cameras  -> ../vehicle/newcar_ws/znxc/config/cam_test_ws
-│   └── lidar    -> ../vehicle/newcar_ws/znxc/config/leishen_ws
-├── modules/
-│   ├── lane_follow    -> ../vehicle/lane_follow_20260923_v2
-│   └── lane_follow_v1 -> ../vehicle/lane_follow_20260923
-├── vehicle/            # 保留原源码目录，以上入口指向同一份文件
-├── scripts/car-git.sh  # Git 状态、拉取、推送入口
-└── docs/
+`output/` 在车上链接到 `~/smartcar-data/catkin/unified`，Git 明确忽略整个输出目录。在其他电脑上构建时，脚本直接创建本地 output 目录，无需建立链接。
 
-~/smartcar-data/
-├── ros/                # 三个工作空间的 build、devel
-├── runs/               # 两个版本循迹的试跑数据
-├── models/             # 原有 ONNX 模型与 TensorRT engine
-├── archives/           # 原有源码压缩包
-└── backups/            # 完整备份、嵌套 Git 历史和移动记录
-```
+录像、日志、模型和备份在 `~/smartcar-data/` 中，不能放进源码目录提交。Python 临时字节码即使产生在源码目录也会被 Git 忽略。
 
-修改 `workspaces/control/src/`、`workspaces/cameras/src/`、`workspaces/lidar/src/` 和 `modules/lane_follow/` 即是在修改 `vehicle/` 中受 Git 管理的文件。Git 状态显示真实的 `vehicle/...` 路径，提交时使用这些路径；实际源码只有一个工作副本。
+## 开发流程
 
-`vehicle/newcar_ws/znxc/config origal/` 和其他重复工作空间是历史副本，保留供对照；日常开发使用上述明确入口。
-
-## 原有入口
-
-旧路径 `/home/smartcar/newcar_ws`、`/home/smartcar/lane_follow_20260923`、`/home/smartcar/lane_follow_20260923_v2` 已改为指向仓库对应目录的符号链接。
-
-原 `.bashrc` 和 `setup_robot.sh` 不需改写。ROS 缓存中的绝对路径仍通过兼容链接访问原文件，构建目录、试跑目录、模型和归档也在原位置保留链接。没有删掉或清空历史数据。
-
-构建数据、录像和 SSH 私钥不进入 Git。Git 跟踪的八个 Catkin `CMakeLists.txt` 链接和五个开发入口链接应保留链接类型，不能替换为普通文本后提交。Windows 未启用符号链接时，应直接编辑 `vehicle/` 中的真实文件。
-
-## GitHub 连接
-
-车上配置了专用于本仓库的 SSH deploy key，私钥在 `~/.ssh/smart_car_github`，没有把个人 GitHub Token 放到小车。该凭据可推送本仓库开发分支，`main` 仍受审核规则保护。
-
-连接使用 GitHub SSH 的 443 端口，设置保存在本仓库的 `core.sshCommand`，不会改变其他 SSH 连接。主机公钥从 GitHub 官方 API 获取并启用严格校验。
-
-如需撤销车上访问权限，在仓库 **Settings → Deploy keys** 删除 `smart-car-nano-20260925`。共享小车的 deploy key 标识设备；提交作者仍由 `git config user.name` 和 `git config user.email` 决定，队员提交前应设置自己的真实身份。个人电脑继续使用各自 GitHub 账户。
-
-## 开发与同步
-
-**基线 PR 合并前，源码在 `snapshot/car-20260925`，`main` 仍只有骨架。** 此时从现有源码分支创建功能分支，不要切到缺少源码的 `main` 后运行车辆。
-
-基线合并后，按以下流程开发（车上 Git 2.17 使用 `checkout`）：
+车上 Git 2.17 使用 `checkout` 命令。没有程序使用待切换的代码、且当前修改已保存后再切换分支。
 
 ```bash
 cd ~/projects/smart-car
 ./scripts/car-git.sh status
-# 确保无未提交修改，并且没有程序正在使用待切换的代码
+# 首次目录迁移 PR 合并前，从 refactor/unified-src-layout 开始开发。
+# 合并后再使用以下 main 起点：
 git fetch origin
-git checkout main                     # 仅在基线 PR 已合并后
+git checkout main
 git pull --ff-only origin main
 git checkout -b feat/your-module
 
-# 修改代码，运行对应测试
+./scripts/build.sh
+source scripts/setup_robot.sh
+./scripts/build.sh run_tests_lane_follow
+catkin_test_results output/build/test_results
+
 git status --short
-git add vehicle/实际修改的文件
-git commit -m "feat(module): 说明本次修改"
+git add src/实际修改的包
+git commit -m "feat(module): 说明修改"
 ./scripts/car-git.sh push
 ```
 
-到 GitHub 发起目标为 `main` 的 PR，经负责人确认后合并。脚本不自动暂存、提交或合并，不直接推送 `main`；有未提交修改时停止，拉取只允许快进更新。
+到 GitHub 创建目标为 main 的 PR，等待负责人确认。`car-git.sh` 不自动暂存、提交或合并，不推送 main；存在未提交修改时停止同步，拉取只允许快进。
 
-取得当前分支更新：`./scripts/car-git.sh pull`。新分支首次推送使用 `./scripts/car-git.sh push`，会建立 upstream；需要 upstream 后才能使用简化的 pull。
+同一开发分支的更新使用 `./scripts/car-git.sh pull`。切换分支后重新构建，再加载环境，不要继续使用上个分支的生成结果。
 
-## 备份与验证
+## 模块入口
 
-原三个工作目录完整归档在 `~/smartcar-data/backups/workspace-20260925-152948/original-workspaces.tar`，包含源码、构建结果、运行数据及嵌套 Git 历史。`operations.json` 记录移动和链接；`nested-git/` 单独保存原 Git 元数据。
+- 底盘：`src/base_controller`；键盘入口 `scripts/keyboard_drive.sh`。
+- 相机：`src/usb_cam`；采用原相机工作空间中实际使用的版本，保留各 launch 文件。
+- 雷达：`src/ls01b_v2`。
+- 循线：`src/lane_follow`，Python 算法在 `python/lane_follow/`，节点在 `scripts/`，配置在 `config/`，测试在 `tests/`。
+- 现有历史视觉：`src/smartcar`，保留其 ROS 包名和消息类型，不作为完整比赛能力已经验证的依据。
 
-恢复前先停止使用这些目录的程序，保留新增代码和数据，再根据操作记录反向恢复，或把完整备份解压到独立目录进行比对。不要覆盖正在使用的工作目录。
+巡线节点通过 ROS 查找配置和雷达节点，不再写死旧工作空间的 devel 路径。仍默认观察，显式 `--execute` 才允许驱动，原有 3 秒上限和停车条件保持不变。
 
-整理后核对原始文件校验值、旧路径、ROS 环境及四个功能包发现；循迹 v1 的 3 项测试和 v2 的 6 项测试均通过。同步脚本在临时测试仓库中验证了 main 推送拦截、未提交修改拦截和 detached HEAD 拦截；已从车上实际推送开发分支并拉取成功。完整备份通过 tar 目录校验，旁边保存 SHA-256 文件。没有驾驶试跑，也未重新编译全部 ROS 包。
+```bash
+source ~/projects/smart-car/scripts/setup_robot.sh
+rosrun lane_follow lane_follow_node.py --help
+# 实际观察会订阅传感器，并可能启动雷达；本次迁移验证不执行此命令：
+roslaunch lane_follow observe.launch
+```
+
+## 认证与身份
+
+小车使用本仓库专用 deploy key，经 GitHub SSH 443 连接。私钥位于 `~/.ssh/smart_car_github`，不进入仓库；撤销访问可在 Settings → Deploy keys 删除 `smart-car-nano-20260925`。
+
+提交前设置自己的 `git config user.name` 和 `git config user.email`。deploy key 标识共享设备，个人电脑继续使用各自 GitHub 账户。
+
+## 旧路径与回退
+
+旧路径仅用于兼容已有命令，日常修改源码一律进入 `~/projects/smart-car/src`。构建验证成功后，旧环境入口改为加载统一 output/devel；旧新车工作空间通过仓库外的兼容目录指向新源码与构建输出。v1 循线保留为归档，不放进当前工作空间。
+
+2026-09-25 初次完整备份位于 `~/smartcar-data/backups/workspace-20260925-152948/original-workspaces.tar`。本次迁移另保存原 vehicle 目录、原 .bashrc 和旧路径链接记录。回退前先保存新修改并停止使用相关代码的程序，不能直接覆盖正在使用的工作目录。详见 [迁移记录](unified-src-migration.md)。

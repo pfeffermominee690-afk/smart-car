@@ -7,5 +7,5 @@
 *.json text eol=lf
 CODEOWNERS text eol=lf
 
-# Preserve the on-car source snapshot byte for byte, including original line endings.
-vehicle/** -text
+# Preserve vendor source bytes; newly authored source files use LF.
+src/** -text

@@ -20,7 +20,7 @@ git switch main
 git pull --ff-only origin main
 git switch -c feat/lane-detection
 # 修改文件，执行模块测试
-git add src/lane_detection.py tests/test_lane_detection.py
+git add src/lane_follow/python/lane_follow/vision.py src/lane_follow/tests/test_lane.py
 git commit -m "feat(vision): add lane detection"
 git push -u origin feat/lane-detection
 ```

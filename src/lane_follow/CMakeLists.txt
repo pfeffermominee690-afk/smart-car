@@ -1,0 +1,11 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(lane_follow)
+find_package(catkin REQUIRED COMPONENTS rospy rosgraph sensor_msgs ackermann_msgs cv_bridge)
+catkin_python_setup()
+catkin_package(CATKIN_DEPENDS rospy rosgraph sensor_msgs ackermann_msgs cv_bridge)
+catkin_install_python(PROGRAMS scripts/lane_follow_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(DIRECTORY config launch DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(tests/test_lane.py)
+endif()

@@ -1,44 +1,59 @@
 # 智能车比赛开发仓库
 
-用于团队管理智能车比赛的模块开发、联调和比赛版本。
+团队统一使用一个 ROS Melodic / Catkin 工作空间。**所有模块源码在 `src/`，全部编译产物在 `output/`，运行数据在仓库外。**
 
-仓库负责人及指定审核人：[@pfeffermominee690-afk](https://github.com/pfeffermominee690-afk)。四位队友使用各自的 GitHub 账户协作，人员名单在加入后更新。
+## 目录
 
-## 开发流程
+```text
+smart-car/
+├── src/
+│   ├── base_controller/          # STM32 底盘控制
+│   ├── ackermann_drive_teleop/   # Ackermann 键盘/手柄遥控
+│   ├── usb_cam/                  # 双摄像头驱动
+│   ├── ls01b_v2/                 # 雷达驱动
+│   ├── serial/                   # 串口通信库
+│   ├── laser_test/               # 激光处理及消息
+│   ├── smartcar/                 # 现有历史视觉程序及消息
+│   ├── teleop_twist_keyboard/    # 通用 Twist 遥控工具
+│   └── lane_follow/              # 当前循线：节点、算法、配置、测试
+├── scripts/                      # 构建、环境、Git 和手动运行辅助脚本
+├── docs/                         # 协作、部署和验证记录
+└── output/                       # build/、devel/、install/，不提交 Git
+```
 
-1. 在 Issues 中记录模块任务、验收条件和负责人。
-2. 从最新 `main` 创建功能分支，例如 `feat/lane-detection`。
-3. 在功能分支提交代码，完成测试后发起目标为 `main` 的 Pull Request（PR）。
-4. 负责人检查变更和测试结果，在 GitHub 中提交 **Approve**。
-5. 审核通过后使用 **Squash and merge** 合并，删除已合并的功能分支。
+各包内部的配置、launch 文件和测试与模块放在一起。仓库不再包含 `vehicle/`、`workspaces/`、`modules/` 等重复层级，源码目录是真实文件夹，在 Windows 和 Ubuntu 上都能直接浏览。
 
-一个 PR 聚焦一个功能或修复；不要求每位队友使用一个长期固定分支。完整命令见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+## 构建与验证
 
-## 模块组织
+在已安装项目依赖的 Ubuntu 18.04 / ROS Melodic 环境中：
 
-| 路径 | 内容 |
-| --- | --- |
-| `src/` | 业务代码及 ROS 功能包，按模块建子目录 |
-| `config/` | 可共享的配置示例与标定参数，说明单位及适用车辆 |
-| `tests/` | 离线测试、回放验证与测试样例 |
-| `docs/` | 接口约定、部署说明、实验结论与比赛记录 |
+```bash
+cd ~/projects/smart-car
+./scripts/build.sh
+source scripts/setup_robot.sh
+./scripts/build.sh run_tests_lane_follow
+catkin_test_results output/build/test_results
+rosrun lane_follow lane_follow_node.py --help
+```
 
-建议模块：相机/雷达/底盘驱动、视觉循迹、交通灯与标志识别、避障与停车、任务状态机与统一控制。目录仅用于组织开发，不代表模块已经完成；模块负责人由队长分配。
+构建不会启动相机、雷达或车辆控制。`src/lane_follow/launch/observe.launch` 是限时观察入口，不发送行驶命令；实际使用前需确认传感器配置。驱动和历史业务代码的可运行范围见各模块及 [车端指南](docs/car-workspace-layout.md)。
 
-## main 的审核要求
+## 团队协作
 
-目标配置为：必须通过 PR 合并、至少一次批准、必须由 CODEOWNERS 中的负责人批准、新提交使旧批准失效、讨论解决后才能合并，禁止强制推送及删除 `main`。
+负责人及指定审核人：[@pfeffermominee690-afk](https://github.com/pfeffermominee690-afk)。队友从 `main` 新建功能分支，在 `src/模块名/` 中开发，提交测试证据后发起 PR。
 
-**CODEOWNERS 文件本身不能强制阻止合并。必须在 GitHub 设置中启用分支保护或规则集，并要求 Code Owner 审核。** 私有仓库是否支持取决于账户套餐；以 GitHub 设置中实际生效的规则为准。未启用保护前不要将其视为受保护的协作仓库。
+合并到 `main` 必须经过负责人 Code Owner 审核；新提交使旧批准失效，讨论须解决，禁止强制推送和删除主分支。GitHub 不允许 PR 作者批准自己的 PR，负责人发起的 PR 需要其明确确认后按管理员流程处理，并恢复审核保护。
 
-## 车上源码基线
+```bash
+./scripts/car-git.sh status
+# 检查、测试并 git commit 后
+./scripts/car-git.sh push
+```
 
-已从小车读取 2026-09-25 的源码快照，位于 [`vehicle/`](vehicle/README.md)。包含主工作空间和两个版本的循迹原型，保留原路径关系、文件内容、可执行权限和 Linux 符号链接。
+详细步骤见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-来源、排除范围、文件 SHA-256 和测试结果见 [同步说明](docs/car-source-20260925.md)。系统镜像、安装包、编译产物、试跑录像及登录凭据不纳入本次同步。后续整理或改进代码仍按模块发起 PR。
+## 数据与历史
 
-## 小车上的开发入口
+车上 `output` 指向 `~/smartcar-data/catkin/unified`，包含可重新生成的编译结果。录像、模型和备份分别保存在 `~/smartcar-data/runs`、`models`、`backups`，不上传 Git。
 
-Ubuntu 上的主仓库位于 `~/projects/smart-car`。底盘、相机和雷达工作空间分别从 `workspaces/control`、`workspaces/cameras`、`workspaces/lidar` 进入；当前循迹代码从 `modules/lane_follow` 进入。
-
-在仓库中执行 `./scripts/car-git.sh status` 查看修改，提交后执行 `./scripts/car-git.sh push` 同步开发分支。目录、原路径兼容、备份和完整流程见 [车端开发指南](docs/car-workspace-layout.md)。
+原始源码基线保存在 Git 提交 `e69cf0d` 和车上完整备份中；旧版循线和重复工作空间不再放进当前构建树。原始下载校验清单为历史记录，不表示重构后的路径或内容仍与旧快照相同。参见 [迁移记录](docs/unified-src-migration.md)。
