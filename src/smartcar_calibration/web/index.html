@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>智能车 · 双相机标定</title>
+<style>
+body{font:16px system-ui,sans-serif;background:#101b29;color:#edf3fa;max-width:1060px;margin:25px auto;padding:0 18px}h1{font-size:26px}button,select{font:inherit;padding:10px 14px;margin:5px;border:0;border-radius:7px}button{background:#9ee5c1;cursor:pointer}button:disabled{opacity:.4;cursor:default}select{background:#e4eefb}.panel{background:#1c2b3d;padding:16px;border-radius:12px;margin:14px 0}#frame{max-width:100%;min-height:180px}#status{font-weight:bold;padding:10px 0}.warn{color:#ffd18c}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:14px ui-monospace,monospace}small{color:#b6c6d9}#error{color:#ffb7ae;white-space:pre-wrap}
+</style>
+<h1>前 / 后摄像头独立标定</h1>
+<p>8 × 6 内角点 · 方格 25 mm · 每个相机建议采集 25–35 张不同姿态</p>
+<div class="panel">
+<label>当前相机 <select id="camera"><option value="front">前摄像头 cam_2</option><option value="rear">后摄像头 cam_1</option></select></label>
+<span id="board"></span><div id="status">正在连接…</div>
+<img id="frame" alt="等待所选相机图像"><p id="topic"></p>
+<button id="capture" disabled>采集一张（空格）</button><button id="undo" disabled>撤销上一张</button>
+<button id="calibrate" disabled>计算并保存候选参数</button><button id="view" disabled>切换原图 / 去畸变</button>
+<p id="error" role="alert"></p><p id="message"></p>
+</div>
+<div class="panel"><b>采集进度</b><pre id="progress"></pre>
+<small>请覆盖画面左、右、上、下及四角；改变远近，并向左右、上下倾斜约 15–35°。整块棋盘清晰入镜、短暂停稳后采集。重复姿态和过期图像会被拒绝。</small></div>
+<div class="panel"><b>结果与检查</b><pre id="results">尚未计算。前、后相机的样本和结果各自保存。</pre>
+<p class="warn">自动检查通过后，仍需拿新的棋盘姿态及直线物体验证去畸变画面。此页面只保存候选文件，不会替换驱动参数。</p></div>
+<script>
+let state=null,pending=false;
+const $=id=>document.getElementById(id);
+function render(s){state=s;$('camera').value=s.selected;$('board').textContent=`内角点 ${s.board.join(' × ')} / ${s.square_mm} mm`;
+ const live=s.frame_age!==null&&s.frame_age<=2;
+ $('status').textContent=!live?'无实时图像：检查相机话题和驱动':s.detected?'棋盘已识别，可以采集':'画面已连接，等待完整棋盘';
+ $('frame').style.opacity=live?'1':'.25';$('topic').textContent=s.topics[s.selected]+(s.undistorted?' · 去畸变预览':' · 原图 + 角点');
+ $('message').textContent=s.busy?`正在计算 ${s.busy}，请稍候…`:s.message;
+ $('capture').disabled=pending||!!s.busy||!s.detected;$('undo').disabled=pending||!!s.busy||!s.datasets[s.selected].count;
+ $('calibrate').disabled=pending||!!s.busy||s.datasets[s.selected].count<s.datasets[s.selected].minimum;
+ $('view').disabled=pending||!s.results[s.selected];$('camera').disabled=pending;
+ $('progress').textContent=Object.entries(s.datasets).map(([name,d])=>`${name==='front'?'前':'后'}相机：${d.count} 张（最低 ${d.minimum}）\n  中心移动跨度：${d.coverage.center_span.map(x=>(x*100).toFixed(0)+'%').join(' / ')}，目标均 ≥25%\n  角点覆盖跨度：${d.coverage.corner_span.map(x=>(x*100).toFixed(0)+'%').join(' / ')}，目标均 ≥60%\n  远近尺寸比：${d.coverage.size_ratio.toFixed(2)}，目标 ≥1.30\n  数据目录：${d.directory}`).join('\n\n');
+ $('results').textContent=Object.entries(s.results).map(([name,r])=>`${name==='front'?'前':'后'}相机：${r.automatic_checks_passed?'自动检查通过，待实物验证':'需要重新采集 / 补充样本'}\nRMS = ${r.rms_px.toFixed(3)} px；样本 ${r.sample_count} 张\n${r.warnings.join('\n')}\n保存位置：${r.result_directory}\n文件：camera.yaml / report.json / dataset.json`).join('\n\n')||'尚未计算。已有会话恢复后，请重新点击计算。';}
+async function refresh(){try{const response=await fetch('/state');if(!response.ok)throw Error('HTTP '+response.status);const s=await response.json();if(!pending)render(s);}catch(e){$('status').textContent='控制服务连接断开';for(const id of ['capture','undo','calibrate','view'])$(id).disabled=true;}}
+async function action(kind,camera){if(!state||pending)return;pending=true;render(state);$('error').textContent='';try{const response=await fetch('/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:kind,camera:camera||state.selected,token:state.token})});const data=await response.json();if(!response.ok)throw Error(data.error||'请求被拒绝');pending=false;render(data);}catch(e){$('error').textContent=e.message;}finally{pending=false;await refresh();}}
+for(const id of ['capture','undo','calibrate','view'])$(id).onclick=()=>action(id);
+$('camera').onchange=()=>action('select',$('camera').value);
+document.addEventListener('keydown',e=>{if(e.code==='Space'&&!e.repeat&&!['SELECT','BUTTON'].includes(document.activeElement.tagName)){e.preventDefault();if(!$('capture').disabled)action('capture');}});
+function frame(){if(state&&state.frame_age!==null&&state.frame_age<=2)$('frame').src='/frame.jpg?t='+Date.now();}
+refresh();setInterval(refresh,1000);setInterval(frame,500);
+</script></html>

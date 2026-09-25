@@ -15,7 +15,8 @@ smart-car/
 │   ├── laser_test/               # 激光处理及消息
 │   ├── smartcar/                 # 现有历史视觉程序及消息
 │   ├── teleop_twist_keyboard/    # 通用 Twist 遥控工具
-│   └── lane_follow/              # 当前循线：节点、算法、配置、测试
+│   ├── lane_follow/              # 当前循线：节点、算法、配置、测试
+│   └── smartcar_calibration/      # 前后相机标定、网页采集、参数及质量报告
 ├── scripts/                      # 构建、环境与 Git 辅助脚本
 ├── docs/                         # 协作、部署和验证记录
 └── output/                       # build/、devel/、install/，不提交 Git
@@ -37,6 +38,10 @@ rosrun lane_follow lane_follow_node.py --help
 ```
 
 构建不会启动相机、雷达或车辆控制。`src/lane_follow/launch/observe.launch` 是限时观察入口，不发送行驶命令；实际使用前需确认传感器配置。驱动和历史业务代码的可运行范围见各模块及 [车端指南](docs/car-workspace-layout.md)。
+
+## 相机标定
+
+前后摄像头分别标定：8×6 内角点、25 mm 方格。使用浏览器控制采集和计算，详见 [操作指南](docs/camera-calibration.md) 和 [VS Code Codex 交接提示词](docs/camera-calibration-codex-handoff.md)。采集数据保存在仓库外，不上传公开仓库。
 
 ## 团队协作
 

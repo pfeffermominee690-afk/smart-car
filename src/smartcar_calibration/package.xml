@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>smartcar_calibration</name>
+  <version>0.1.0</version>
+  <description>Independent front and rear camera intrinsic calibration with a local web control panel.</description>
+  <maintainer email="250671320+pfeffermominee690-afk@users.noreply.github.com">Smart car team</maintainer>
+  <license>TODO</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>rospy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>cv_bridge</depend>
+  <exec_depend>python-rospkg</exec_depend>
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-opencv</exec_depend>
+  <exec_depend>python-yaml</exec_depend>
+  <exec_depend>usb_cam</exec_depend>
+  <test_depend>python-nose</test_depend>
+</package>
