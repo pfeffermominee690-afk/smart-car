@@ -36,3 +36,9 @@
 已从小车读取 2026-09-25 的源码快照，位于 [`vehicle/`](vehicle/README.md)。包含主工作空间和两个版本的循迹原型，保留原路径关系、文件内容、可执行权限和 Linux 符号链接。
 
 来源、排除范围、文件 SHA-256 和测试结果见 [同步说明](docs/car-source-20260925.md)。系统镜像、安装包、编译产物、试跑录像及登录凭据不纳入本次同步。后续整理或改进代码仍按模块发起 PR。
+
+## 小车上的开发入口
+
+Ubuntu 上的主仓库位于 `~/projects/smart-car`。底盘、相机和雷达工作空间分别从 `workspaces/control`、`workspaces/cameras`、`workspaces/lidar` 进入；当前循迹代码从 `modules/lane_follow` 进入。
+
+在仓库中执行 `./scripts/car-git.sh status` 查看修改，提交后执行 `./scripts/car-git.sh push` 同步开发分支。目录、原路径兼容、备份和完整流程见 [车端开发指南](docs/car-workspace-layout.md)。

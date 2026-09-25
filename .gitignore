@@ -53,3 +53,10 @@ datasets/
 .DS_Store
 Thumbs.db
 *.swp
+
+# On-car runtime directories are symlinks: match without trailing slash.
+/vehicle/newcar_ws/znxc/config/*/build
+/vehicle/newcar_ws/znxc/config/*/devel
+/vehicle/newcar_ws/znxc/config/*/install
+/vehicle/lane_follow_20260923/runs
+/vehicle/lane_follow_20260923_v2/runs
