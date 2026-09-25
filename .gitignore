@@ -1,0 +1,55 @@
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+config/local.*
+.venv/
+venv/
+
+# Python, native build and ROS outputs
+__pycache__/
+*.py[cod]
+.pytest_cache/
+build/
+devel/
+install/
+log/
+logs/
+*.log
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+
+# Runs, data, model weights, archives and images of disks
+runs/
+datasets/
+*.bag
+*.db3
+*.mcap
+*.avi
+*.mp4
+*.mov
+*.pt
+*.pth
+*.onnx
+*.engine
+*.zip
+*.7z
+*.tar
+*.tar.gz
+*.tgz
+*.iso
+*.img
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
