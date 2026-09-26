@@ -57,20 +57,18 @@ debug_images_lock = threading.Lock()
 
 def show_cv_window(title, image):
     """Queue the newest debug frame; the ROS main thread displays it."""
-    if show_windows and title in ('out_img', 'result'):
+    if show_windows and title == 'result':
         with debug_images_lock:
             debug_images[title] = image.copy()
 
 
 def run_debug_window_loop():
     """Run OpenCV HighGUI on the main thread to avoid callback deadlocks."""
-    cv2.namedWindow('out_img', cv2.WINDOW_NORMAL)
     cv2.namedWindow('result', cv2.WINDOW_NORMAL)
     rate = rospy.Rate(30)
     while not rospy.is_shutdown():
         with debug_images_lock:
-            frames = [(title, debug_images.get(title))
-                      for title in ('out_img', 'result')]
+            frames = [('result', debug_images.get('result'))]
         for title, frame in frames:
             if frame is not None:
                 cv2.imshow(title, frame)
@@ -249,6 +247,7 @@ def run_sliding_window(image, centroid_starter, sliding_window_specs, showMe=sho
               'height': round(image.shape[0] / sliding_window_specs['n_steps'])}
     hotpixels_log = {'x': [], 'y': []}
     centroids_log = []
+    out_img = image
     if showMe:
         out_img = (np.dstack((image, image, image)) * 255).astype('uint8')
     for step in range(sliding_window_specs['n_steps']):
@@ -279,7 +278,12 @@ def run_sliding_window(image, centroid_starter, sliding_window_specs, showMe=sho
         hotpixels_log['y'].extend(hotpixels[1].tolist())
         # update record of centroid
         centroids_log.append(centroid)
-        out_img = cv2.rectangle(image,(int(window['x0']), int(window['y0'] - window['height'])), (int(window['x0'] + window['width']), int(window['y0'])), (255, 0, 0), 2)
+        if showMe:
+            out_img = cv2.rectangle(
+                out_img,
+                (int(window['x0']), int(window['y0'] - window['height'])),
+                (int(window['x0'] + window['width']), int(window['y0'])),
+                (255, 0, 0), 2)
         
         ''' 
         if Left_or_Right == 0:
@@ -586,15 +590,10 @@ def lane_detection(img):
     mid_time=time.time()
 ######mid_time
     end_time=time.time()
-    HoughLine_image = np.array(warped_image,np.uint8)
-    lines = cv2.HoughLinesP(HoughLine_image,1,np.pi/180,100,100,100,50)
-    if lines is not None :
-        for x1,y1,x2,y2 in lines[0]:
-            cv2.line(HoughLine_image,(x1,y1),(x2,y2),(255,0,0),1)
 ########################################################################fit##################################################################################
 
     peak_thresh = 10
-    showMe = 1
+    showMe = 0
     previous_fit = right_lane_tracker['fit']
     if previous_fit is None:
         centroid_starter_right = find_right_starter(warped_image, peak_thresh)
@@ -611,23 +610,14 @@ def lane_detection(img):
         warped_image.copy(), centroid_starter_right['centroid'],
         sliding_window_specs, showMe=showMe)
 
-    if lines is not None:
-        print('HoughLine is detected')
-
     fit_lineRight_singleframe, tracking_status = update_right_lane_fit(
         log_lineRight, corr_img.shape[0])
-    out_img_debug = np.uint8(np.clip(out_img, 0, 255))
-    if len(out_img_debug.shape) == 2:
-        out_img_debug = cv2.cvtColor(out_img_debug, cv2.COLOR_GRAY2BGR)
 
     msg = AckermannDriveStamped()
     if fit_lineRight_singleframe is None:
-        cv2.putText(out_img_debug, 'RIGHT LANE LOST - STOP', (20, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
         result = corr_img.copy()
         cv2.putText(result, 'RIGHT LANE LOST - STOP', (50, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-        show_cv_window('out_img', out_img_debug)
         show_cv_window('result', result)
         msg.drive.speed = 0.0
         msg.drive.steering_angle = 0.0
@@ -648,13 +638,6 @@ def lane_detection(img):
 
     right_points = np.transpose(np.vstack([right_fitx, var_pts])).astype(np.int32)
     center_points = np.transpose(np.vstack([center_fitx, var_pts])).astype(np.int32)
-    cv2.polylines(out_img_debug, [right_points], False, (0, 255, 0), 4)
-    cv2.polylines(out_img_debug, [center_points], False, (0, 255, 255), 3)
-    cv2.putText(out_img_debug, 'right:%s pixels:%d' %
-                (tracking_status, len(log_lineRight['x'])), (15, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
-    show_cv_window('out_img', out_img_debug)
-
     wrap_zero = np.zeros_like(gray_ex).astype(np.uint8)
     color_wrap = np.dstack((wrap_zero, wrap_zero, wrap_zero))
     cv2.polylines(color_wrap, [right_points], False, (0, 255, 0), 8)
