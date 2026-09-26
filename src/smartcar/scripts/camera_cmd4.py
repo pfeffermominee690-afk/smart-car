@@ -64,6 +64,8 @@ def show_cv_window(title, image):
 
 def run_debug_window_loop():
     """Run OpenCV HighGUI on the main thread to avoid callback deadlocks."""
+    cv2.namedWindow('out_img', cv2.WINDOW_NORMAL)
+    cv2.namedWindow('result', cv2.WINDOW_NORMAL)
     rate = rospy.Rate(30)
     while not rospy.is_shutdown():
         with debug_images_lock:
@@ -712,8 +714,6 @@ def detector():
     camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
     show_windows = rospy.get_param(
         '~show_windows', bool(os.environ.get('DISPLAY')))
-    if show_windows:
-        cv2.startWindowThread()
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
