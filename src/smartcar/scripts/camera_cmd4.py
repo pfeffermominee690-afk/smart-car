@@ -268,14 +268,14 @@ def run_sliding_window(image, centroid_starter, sliding_window_specs, showMe=sho
             # if showMe:
             # print('peak intensity{}'.format(peak_intensity))
             # print('This is centroid:{}'.format(centroid))
-        mask_window = np.zeros_like(image)
-        mask_window[int(window['y0'] - window['height']):int(window['y0']), int(window['x0']):int(window['x0'] + window['width'])] = image[int(window['y0'] - window['height']):int(window['y0']), int(window['x0']):int(window['x0'] + window['width'])]
-
-        hotpixels = np.nonzero(mask_window)
-        # print(hotpixels_log['x'])
-
-        hotpixels_log['x'].extend(hotpixels[0].tolist())
-        hotpixels_log['y'].extend(hotpixels[1].tolist())
+        y_start = int(max(0, window['y0'] - window['height']))
+        y_end = int(min(image.shape[0], window['y0']))
+        x_start = int(max(0, window['x0']))
+        x_end = int(min(image.shape[1], window['x0'] + window['width']))
+        window_pixels = image[y_start:y_end, x_start:x_end]
+        local_rows, local_columns = np.nonzero(window_pixels)
+        hotpixels_log['x'].extend((local_rows + y_start).tolist())
+        hotpixels_log['y'].extend((local_columns + x_start).tolist())
         # update record of centroid
         centroids_log.append(centroid)
         if showMe:
@@ -568,8 +568,8 @@ def lane_detection(img):
     #combined_output = image_process(gray_ex)
     display(combined_output,'Combined output',color=0)
     mask = np.zeros_like(combined_output)
-    vertices = np.array([[(100,278),(0,435),(640,435),(500,250)]],dtype=np.int32)
-    cv2.fillPoly(mask,vertices,1)
+    vertices = np.array([[(190,205),(0,340),(639,340),(450,205)]],dtype=np.int32)
+    cv2.fillPoly(mask,vertices,255)
     masked_image = cv2.bitwise_and(combined_output,mask)
     display(masked_image,'Masked',color=0)
     
@@ -578,7 +578,7 @@ def lane_detection(img):
     cleaned = masked_image
     display(cleaned,'cleaned',color=0)
     # original image to bird view (transformation)
-    src_pts = np.float32([[220,306],[1,435],[639,435],[451,306]])
+    src_pts = np.float32([[190,205],[0,340],[639,340],[450,205]])
     dst_pts = np.float32([[70,0],[70,480],[570,480],[570,0]])
     transform_matrix = perspective_transform(src_pts,dst_pts)
     warped_image = birdView(cleaned*1.0,transform_matrix['M'])
