@@ -13,6 +13,7 @@ from laser_test.msg import laser_control
 import tensorflow as tf
 import math
 import os
+import threading
 #from skimage import morphology
 import time
 global x0 
@@ -50,13 +51,30 @@ RIGHT_MAX_FAR_JUMP_PX = 90.0
 RIGHT_HOLD_FRAMES = 1
 RIGHT_SMOOTHING_ALPHA = 0.75
 right_lane_tracker = {'fit': None, 'lost_frames': 0}
+debug_images = {}
+debug_images_lock = threading.Lock()
 
 
 def show_cv_window(title, image):
-    """Display a debug image only when explicitly enabled."""
+    """Queue the newest debug frame; the ROS main thread displays it."""
     if show_windows and title in ('out_img', 'result'):
-        cv2.imshow(title, image)
+        with debug_images_lock:
+            debug_images[title] = image.copy()
+
+
+def run_debug_window_loop():
+    """Run OpenCV HighGUI on the main thread to avoid callback deadlocks."""
+    rate = rospy.Rate(30)
+    while not rospy.is_shutdown():
+        with debug_images_lock:
+            frames = [(title, debug_images.get(title))
+                      for title in ('out_img', 'result')]
+        for title, frame in frames:
+            if frame is not None:
+                cv2.imshow(title, frame)
         cv2.waitKey(1)
+        rate.sleep()
+    cv2.destroyAllWindows()
 
 
 def display(img,title,color=1):
@@ -700,7 +718,10 @@ def detector():
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
     pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
-    rospy.spin()
+    if show_windows:
+        run_debug_window_loop()
+    else:
+        rospy.spin()
 
 if __name__ == '__main__':
     detector()
