@@ -12,6 +12,7 @@ from ackermann_msgs.msg import AckermannDriveStamped
 from laser_test.msg import laser_control
 import tensorflow as tf
 import math
+import os
 #from skimage import morphology
 import time
 global x0 
@@ -36,6 +37,19 @@ distortionCoe = np.array([-0.41251110946304526,
 
 showMe = 0
 show_windows = True
+
+# The bird-view destination maps the 60 cm lane to x=70..570.
+# Follow only the solid right boundary and infer the lane centre 30 cm left of it.
+LANE_WIDTH_PX = 500.0
+HALF_LANE_WIDTH_PX = LANE_WIDTH_PX / 2.0
+RIGHT_EXPECTED_X = 570
+RIGHT_MIN_PIXELS = 300
+RIGHT_MIN_VERTICAL_BINS = 6
+RIGHT_MAX_BOTTOM_JUMP_PX = 70.0
+RIGHT_MAX_FAR_JUMP_PX = 90.0
+RIGHT_HOLD_FRAMES = 1
+RIGHT_SMOOTHING_ALPHA = 0.75
+right_lane_tracker = {'fit': None, 'lost_frames': 0}
 
 
 def show_cv_window(title, image):
@@ -136,7 +150,9 @@ def find_centroid(image,peak_thresh,window,showMe):
                         int(window['x0']):int(window['x0']+window['width'])]
     histogram = np.sum(mask_window,axis=0)
     centroid = np.argmax(histogram)
-    hotpixels_cnt = np.sum(histogram)
+    # This value is used as a density ratio by the sliding-window tracker.
+    # Count pixels instead of summing their 0/255 intensities.
+    hotpixels_cnt = np.count_nonzero(mask_window)
     peak_intensity = histogram[centroid]
     if peak_intensity<=peak_thresh:
         centroid = int(round(window['x0']+window['width']/2))
@@ -166,6 +182,25 @@ def find_starter_centroids(image,x0,peak_thresh,showMe):
         centroid,peak_intensity,_ = find_centroid(image,peak_thresh,window,showMe)
     return {'centroid':centroid,'intensity':peak_intensity}
 # if number of histogram pixels in window is below 10,condisder them as noise and does not attempt to get centroid
+
+
+def find_right_starter(image, peak_thresh):
+    """Find the solid right boundary near its expected bird-view position."""
+    height, width = image.shape[:2]
+    x_min = width / 2
+    x_max = min(width, int(width * 0.98))
+    histogram = np.sum(image[height / 2:height, x_min:x_max], axis=0)
+    if histogram.size == 0 or np.max(histogram) <= peak_thresh:
+        histogram = np.sum(image[:, x_min:x_max], axis=0)
+    if histogram.size == 0 or np.max(histogram) <= peak_thresh:
+        return {'centroid': RIGHT_EXPECTED_X, 'intensity': 0}
+
+    # Pick the strong response closest to the expected right-lane position.
+    strong_threshold = max(float(peak_thresh), float(np.max(histogram)) * 0.35)
+    candidates = np.where(histogram >= strong_threshold)[0] + x_min
+    centroid = int(candidates[np.argmin(np.abs(candidates - RIGHT_EXPECTED_X))])
+    return {'centroid': centroid,
+            'intensity': histogram[centroid - x_min]}
 
 
 
@@ -338,6 +373,61 @@ def predict_line(x0,xmax,coeffs):
     return np.column_stack((x_pts,pred))
 
 
+def evaluate_fit(coeffs, row):
+    return coeffs['a2'] * row ** 2 + coeffs['a1'] * row + coeffs['a0']
+
+
+def hold_previous_right_fit(reason):
+    """Reject a noisy frame and briefly keep the last trusted right line."""
+    right_lane_tracker['lost_frames'] += 1
+    previous = right_lane_tracker['fit']
+    if previous is not None and right_lane_tracker['lost_frames'] <= RIGHT_HOLD_FRAMES:
+        return previous, 'held:' + reason
+    return None, 'lost:' + reason
+
+
+def update_right_lane_fit(hotpixels, image_height):
+    """Validate and smooth one right-boundary fit across consecutive frames."""
+    rows = np.asarray(hotpixels['x'])
+    columns = np.asarray(hotpixels['y'])
+    if rows.size < RIGHT_MIN_PIXELS:
+        return hold_previous_right_fit('few_pixels')
+
+    vertical_bins = np.unique(np.minimum(
+        (rows * 10 / image_height).astype(np.int32), 9))
+    if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
+        return hold_previous_right_fit('short_line')
+
+    candidate = polynomial_fit(hotpixels)
+    bottom_row = image_height - 1
+    far_row = int(image_height * 0.50)
+    bottom_x = evaluate_fit(candidate, bottom_row)
+    far_x = evaluate_fit(candidate, far_row)
+    if (not np.isfinite(bottom_x) or not np.isfinite(far_x) or
+            bottom_x < 640 * 0.45 or bottom_x >= 640 or
+            far_x < 220 or far_x >= 640):
+        return hold_previous_right_fit('bad_geometry')
+
+    previous = right_lane_tracker['fit']
+    if previous is not None:
+        previous_bottom_x = evaluate_fit(previous, bottom_row)
+        previous_far_x = evaluate_fit(previous, far_row)
+        if (abs(bottom_x - previous_bottom_x) > RIGHT_MAX_BOTTOM_JUMP_PX or
+                abs(far_x - previous_far_x) > RIGHT_MAX_FAR_JUMP_PX):
+            return hold_previous_right_fit('position_jump')
+
+        alpha = RIGHT_SMOOTHING_ALPHA
+        candidate = {
+            'a0': alpha * candidate['a0'] + (1.0 - alpha) * previous['a0'],
+            'a1': alpha * candidate['a1'] + (1.0 - alpha) * previous['a1'],
+            'a2': alpha * candidate['a2'] + (1.0 - alpha) * previous['a2']
+        }
+
+    right_lane_tracker['fit'] = candidate
+    right_lane_tracker['lost_frames'] = 0
+    return candidate, 'tracked'
+
+
 class PID:
     def __init__(self, P=0.2, I=0.0, D=0.0):
         self.Kp = P
@@ -474,8 +564,6 @@ def lane_detection(img):
     display(cleaned,'undistorted',color=0)
     display(warped_image,'BirdViews',color=0)
     mid_time=time.time()
-    white_Left = cv2.countNonZero(warped_image[:,0:warped_image.shape[1]/2])
-    white_Right = cv2.countNonZero(warped_image[:,warped_image.shape[1]/2:warped_image.shape[1]])
 ######mid_time
     end_time=time.time()
     HoughLine_image = np.array(warped_image,np.uint8)
@@ -485,97 +573,93 @@ def lane_detection(img):
             cv2.line(HoughLine_image,(x1,y1),(x2,y2),(255,0,0),1)
 ########################################################################fit##################################################################################
 
-    bottom_crop = -40
-    #warped_image = warped_image[0:bottom_crop,:]
     peak_thresh = 10
     showMe = 1
-    centroid_starter_right = find_starter_centroids(warped_image,x0=warped_image.shape[1]/2,
-                                               peak_thresh=peak_thresh,showMe=showMe)
-    centroid_starter_left = find_starter_centroids(warped_image,x0=0,peak_thresh=peak_thresh,
-                                              showMe=showMe)
-    sliding_window_specs = {'width': 60, 'n_steps': 10}
+    previous_fit = right_lane_tracker['fit']
+    if previous_fit is None:
+        centroid_starter_right = find_right_starter(warped_image, peak_thresh)
+    else:
+        previous_bottom = evaluate_fit(previous_fit, warped_image.shape[0] - 1)
+        centroid_starter_right = {
+            'centroid': int(max(warped_image.shape[1] / 2,
+                                min(warped_image.shape[1] - 1, previous_bottom))),
+            'intensity': 1
+        }
 
-    show_cv_window('warped_image', warped_image)
+    sliding_window_specs = {'width': 80, 'n_steps': 10}
+    log_lineRight, out_img = run_sliding_window(
+        warped_image.copy(), centroid_starter_right['centroid'],
+        sliding_window_specs, showMe=showMe)
 
-####window#####
-   
-
-    log_lineLeft,out_img_Left = run_sliding_window(warped_image, centroid_starter_left['centroid'],sliding_window_specs, showMe=showMe)
-    log_lineRight,out_img = run_sliding_window(out_img_Left, centroid_starter_right['centroid'] , sliding_window_specs,showMe=showMe)
-
-    start_time=time.time()
     if lines is not None:
         print('HoughLine is detected')
-    show_cv_window('out_img', out_img)
-    MD_thresh = 1.8
-    #log_lineLeft['x'], log_lineLeft['y'] = \
-    #MD_removeOutliers(log_lineLeft['x'], log_lineLeft['y'], MD_thresh)
-    #log_lineRight['x'], log_lineRight['y'] = \
-    #MD_removeOutliers(log_lineRight['x'], log_lineRight['y'], MD_thresh)
-    
-    ym_per_pix = 0.6/480
-    xm_per_pix = 0.6/640
-    '''
-    for i in range(len(log_lineRight['y'])):
-        log_lineRight['y'][i] = log_lineRight['y'][i] + out_img.shape[1]/2
-    '''
-    #log_lineRight['x'] = log_lineRight['x'] + out_img.shape[1]/2
 
+    fit_lineRight_singleframe, tracking_status = update_right_lane_fit(
+        log_lineRight, corr_img.shape[0])
+    out_img_debug = np.uint8(np.clip(out_img, 0, 255))
+    if len(out_img_debug.shape) == 2:
+        out_img_debug = cv2.cvtColor(out_img_debug, cv2.COLOR_GRAY2BGR)
 
-
-    fit_lineRight_singleframe = polynomial_fit(log_lineRight)
-    fit_lineLeft_singleframe = polynomial_fit(log_lineLeft)
-    dis_Left = log_lineLeft['y'][len(log_lineLeft['y'])-1] - log_lineLeft['y'][0]
-    dis_Right = log_lineRight['y'][len(log_lineRight['y'])-1] - log_lineRight['y'][0]
-    var_pts = np.linspace(0,corr_img.shape[0]-1,num=corr_img.shape[0])
-    pred_lineLeft_singleframe = predict_line(0,corr_img.shape[0],fit_lineLeft_singleframe)
-    fit_lineLeft_real = polynomial_fit({'x':[i*xm_per_pix for i in log_lineLeft['x']],
-                                    'y':[i*ym_per_pix for i in log_lineLeft['y']]})
-    pred_lineRight_sigleframe = predict_line(0,corr_img.shape[0],fit_lineRight_singleframe)
-    fit_lineRight_real = polynomial_fit({'x':[i*xm_per_pix for i in log_lineRight['x']],
-                                               'y':[i*ym_per_pix for i in log_lineRight['y']]})
-   
-    pt_curvature = corr_img.shape[0]
-    radOfCurv_r = compute_radOfCurvature(fit_lineRight_real,pt_curvature*ym_per_pix)
-    radOfCurv_l = compute_radOfCurvature(fit_lineLeft_real,pt_curvature*ym_per_pix)
-    average_radCurv = (radOfCurv_r+radOfCurv_l)/2
-    
-    center_of_lane = (pred_lineLeft_singleframe[:,1][-1]+pred_lineRight_sigleframe[:,1][-1])/2
-    offset = (corr_img.shape[1]/2 - center_of_lane)*xm_per_pix
-
-    side_pos = 'right'
-    if offset <0:
-        side_pos = 'left'
-    wrap_zero = np.zeros_like(gray_ex).astype(np.uint8)
-    color_wrap = np.dstack((wrap_zero,wrap_zero,wrap_zero))
-    left_fitx = fit_lineLeft_singleframe['a2']*var_pts**2 + fit_lineLeft_singleframe['a1']*var_pts + fit_lineLeft_singleframe['a0']
-    right_fitx = fit_lineRight_singleframe['a2']*var_pts**2 +     fit_lineRight_singleframe['a1']*var_pts+fit_lineRight_singleframe['a0']
-    pts_left = np.array([np.transpose(np.vstack([left_fitx,var_pts]))])
-    pts_right = np.array([np.flipud(np.transpose(np.vstack([right_fitx,var_pts])))])
-    pts = np.hstack((pts_left,pts_right))
-    cv2.fillPoly(color_wrap,np.int_([pts]),(0,255,0))
-    cv2.putText(color_wrap,'|',(int(corr_img.shape[1]/2),corr_img.shape[0]-10),cv2.FONT_HERSHEY_SIMPLEX,2,(0,0,255),8)
-    cv2.putText(color_wrap,'|',(int(center_of_lane),corr_img.shape[0]-10),cv2.FONT_HERSHEY_SIMPLEX,1,(255,0,0),8)
-    newwrap = cv2.warpPerspective(color_wrap,transform_matrix['Minv'],(corr_img.shape[1],corr_img.shape[0])) 
-    result = cv2.addWeighted(corr_img,1,newwrap,0.3,0)
-    cv2.putText(result,'Vehicle is ' + str(round(offset,3))+'m '+side_pos+' of center',
-            (50,100),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),thickness=2)
-    cv2.putText(result,'Radius of curvature: '+str(round(average_radCurv,3))+'m',(50,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,255),thickness=2)
-    show_cv_window("result", result)
     msg = AckermannDriveStamped()
-   
-    time_diff1=mid_time-start_time
-    time_diff2=end_time-mid_time
-    #print('time_diff1',time_diff1)
-    #print('time_diff2',time_diff2)
+    if fit_lineRight_singleframe is None:
+        cv2.putText(out_img_debug, 'RIGHT LANE LOST - STOP', (20, 35),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        result = corr_img.copy()
+        cv2.putText(result, 'RIGHT LANE LOST - STOP', (50, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        show_cv_window('out_img', out_img_debug)
+        show_cv_window('result', result)
+        msg.drive.speed = 0.0
+        msg.drive.steering_angle = 0.0
+        pub.publish(msg)
+        rospy.logwarn_throttle(1.0, 'Right lane rejected: %s', tracking_status)
+        return
+
+    ym_per_pix = 0.6 / 480.0
+    xm_per_pix = 0.6 / LANE_WIDTH_PX
+    var_pts = np.linspace(0, corr_img.shape[0] - 1,
+                          num=corr_img.shape[0])
+    right_fitx = (fit_lineRight_singleframe['a2'] * var_pts ** 2 +
+                  fit_lineRight_singleframe['a1'] * var_pts +
+                  fit_lineRight_singleframe['a0'])
+    center_fitx = right_fitx - HALF_LANE_WIDTH_PX
+    center_of_lane = center_fitx[-1]
+    offset = (corr_img.shape[1] / 2.0 - center_of_lane) * xm_per_pix
+
+    right_points = np.transpose(np.vstack([right_fitx, var_pts])).astype(np.int32)
+    center_points = np.transpose(np.vstack([center_fitx, var_pts])).astype(np.int32)
+    cv2.polylines(out_img_debug, [right_points], False, (0, 255, 0), 4)
+    cv2.polylines(out_img_debug, [center_points], False, (0, 255, 255), 3)
+    cv2.putText(out_img_debug, 'right:%s pixels:%d' %
+                (tracking_status, len(log_lineRight['x'])), (15, 30),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2)
+    show_cv_window('out_img', out_img_debug)
+
+    wrap_zero = np.zeros_like(gray_ex).astype(np.uint8)
+    color_wrap = np.dstack((wrap_zero, wrap_zero, wrap_zero))
+    cv2.polylines(color_wrap, [right_points], False, (0, 255, 0), 8)
+    cv2.polylines(color_wrap, [center_points], False, (0, 255, 255), 5)
+    cv2.line(color_wrap, (corr_img.shape[1] / 2, corr_img.shape[0] - 35),
+             (corr_img.shape[1] / 2, corr_img.shape[0] - 5), (0, 0, 255), 5)
+    newwrap = cv2.warpPerspective(
+        color_wrap, transform_matrix['Minv'],
+        (corr_img.shape[1], corr_img.shape[0]))
+    result = cv2.addWeighted(corr_img, 1, newwrap, 0.8, 0)
+    cv2.putText(result, 'Right lane: ' + tracking_status, (30, 40),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    cv2.putText(result, 'Offset: ' + str(round(offset, 3)) + 'm', (30, 75),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+    show_cv_window('result', result)
+
+    print('right_lane_status', tracking_status)
+    print('right_lane_pixels', len(log_lineRight['x']))
     print('offset ', offset)
     msg.drive.speed = -30
-    # The base controller converts steering_angle directly to an unsigned byte.
-    # Scale the metre-based lane offset into an executable steering command.
+    # Keep the existing lateral controller; only its lane centre source changed.
     Vehicle_PID.update(offset)
     steering_command = -Vehicle_PID.output * 40.0
     msg.drive.steering_angle = max(-25.0, min(25.0, steering_command))
-    print('steering_angle',msg.drive.steering_angle)
+    print('steering_angle', msg.drive.steering_angle)
     pub.publish(msg)
 
 def camera_callback(data):
@@ -606,9 +690,12 @@ def detector():
     global show_windows
 
     Vehicle_PID = PID(3,0,0)
-    rospy.init_node('camera_cmd3', anonymous=False)
+    rospy.init_node('camera_cmd4', anonymous=False)
     camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
-    show_windows = rospy.get_param('~show_windows', False)
+    show_windows = rospy.get_param(
+        '~show_windows', bool(os.environ.get('DISPLAY')))
+    if show_windows:
+        cv2.startWindowThread()
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
@@ -617,5 +704,3 @@ def detector():
 
 if __name__ == '__main__':
     detector()
-
-
