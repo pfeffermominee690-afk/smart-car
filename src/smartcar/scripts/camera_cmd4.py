@@ -71,6 +71,8 @@ RIGHT_OUTWARD_SWITCH_PX = 18.0
 RIGHT_OUTWARD_PARALLEL_SPREAD_PX = 20.0
 RIGHT_PENDING_MATCH_PX = 18.0
 RIGHT_REACQUIRE_FRAMES = 3
+RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES = 3
+RIGHT_GLOBAL_REACQUIRE_FRAMES = 3
 right_edge_close_kernel_size = 3
 right_lane_tracker = {
     'fit': None,
@@ -351,6 +353,59 @@ def run_right_band_window(image, centroid_starter, sliding_window_specs,
     return hotpixels_log, out_img
 
 
+def starter_candidate_geometry(hotpixels, image_height):
+    """Return a valid starter fit and its near/far positions, or None."""
+    rows = np.asarray(hotpixels['x'])
+    if rows.size < RIGHT_MIN_PIXELS:
+        return None
+    vertical_bins = np.unique(np.minimum(
+        (rows * 10 / image_height).astype(np.int32), 9))
+    if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
+        return None
+
+    candidate = polynomial_fit(hotpixels)
+    bottom_x = evaluate_fit(candidate, image_height - 1)
+    far_x = evaluate_fit(candidate, int(image_height * 0.50))
+    if (not np.isfinite(bottom_x) or not np.isfinite(far_x) or
+            bottom_x < 350 or bottom_x >= 640 or
+            far_x < 220 or far_x >= 640):
+        return None
+    return candidate, float(bottom_x), float(far_x)
+
+
+def find_innermost_right_track(image, sliding_window_specs):
+    """Search the right half from multiple starts and keep the inner track."""
+    starter_positions = range(350, 631, 35)
+    valid_tracks = []
+    fallback = {'x': [], 'y': []}
+
+    for starter in starter_positions:
+        hotpixels, unused = run_right_band_window(
+            image, starter, sliding_window_specs, showMe=False)
+        if len(hotpixels['x']) > len(fallback['x']):
+            fallback = hotpixels
+        geometry = starter_candidate_geometry(hotpixels, image.shape[0])
+        if geometry is None:
+            continue
+        candidate, bottom_x, far_x = geometry
+        valid_tracks.append((bottom_x, far_x, candidate, hotpixels, starter))
+
+    if not valid_tracks:
+        rospy.logwarn_throttle(
+            1.0, 'Global right search: no valid track (%d fallback pixels)',
+            len(fallback['x']))
+        return fallback
+
+    # For a right boundary, the smaller bird-view x position is closer to the
+    # road interior.  All candidates have already passed right-side geometry
+    # and vertical-coverage checks, so the left dashed lane is excluded.
+    selected = min(valid_tracks, key=lambda item: item[0])
+    rospy.loginfo_throttle(
+        1.0, 'Global right search: %d tracks, inner bottom=%.1f far=%.1f start=%d',
+        len(valid_tracks), selected[0], selected[1], selected[4])
+    return selected[3]
+
+
 
 def run_sliding_window(image, centroid_starter, sliding_window_specs, showMe=showMe):
     '''
@@ -566,7 +621,7 @@ def hold_previous_right_fit(reason):
     return None, 'lost:' + reason
 
 
-def update_right_lane_fit(hotpixels, image_height):
+def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
     """Validate and smooth one right-boundary fit across consecutive frames."""
     rows = np.asarray(hotpixels['x'])
     columns = np.asarray(hotpixels['y'])
@@ -594,6 +649,20 @@ def update_right_lane_fit(hotpixels, image_height):
         return hold_previous_right_fit('bad_geometry')
 
     previous = right_lane_tracker['fit']
+    if global_reacquire and previous is not None:
+        sample_rows = np.array([
+            image_height * 0.50,
+            image_height * 0.75,
+            image_height - 1.0])
+        stable_frames = remember_pending_right_fit(candidate, sample_rows)
+        if stable_frames < RIGHT_GLOBAL_REACQUIRE_FRAMES:
+            return hold_previous_right_fit('global_candidate')
+
+        right_lane_tracker['fit'] = candidate
+        right_lane_tracker['lost_frames'] = 0
+        clear_pending_right_fit()
+        return candidate, 'reacquired:global_search'
+
     if previous is not None:
         previous_bottom_x = evaluate_fit(previous, bottom_row)
         previous_far_x = evaluate_fit(previous, far_row)
@@ -802,8 +871,14 @@ def lane_detection(img):
     peak_thresh = 10
     showMe = 0
     previous_fit = right_lane_tracker['fit']
-    if previous_fit is None:
-        centroid_starter_right = find_right_starter(warped_image, peak_thresh)
+    sliding_window_specs = {'width': 60, 'n_steps': 10}
+    global_reacquire = (
+        previous_fit is not None and
+        right_lane_tracker['lost_frames'] >=
+        RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES)
+    if previous_fit is None or global_reacquire:
+        log_lineRight = find_innermost_right_track(
+            warped_image, sliding_window_specs)
     else:
         previous_bottom = evaluate_fit(previous_fit, warped_image.shape[0] - 1)
         centroid_starter_right = {
@@ -811,14 +886,13 @@ def lane_detection(img):
                                 min(warped_image.shape[1] - 1, previous_bottom))),
             'intensity': 1
         }
-
-    sliding_window_specs = {'width': 60, 'n_steps': 10}
-    log_lineRight, out_img = run_right_band_window(
-        warped_image.copy(), centroid_starter_right['centroid'],
-        sliding_window_specs, showMe=showMe)
+        log_lineRight, out_img = run_right_band_window(
+            warped_image.copy(), centroid_starter_right['centroid'],
+            sliding_window_specs, showMe=showMe)
 
     fit_lineRight_singleframe, tracking_status = update_right_lane_fit(
-        log_lineRight, corr_img.shape[0])
+        log_lineRight, corr_img.shape[0],
+        global_reacquire=global_reacquire)
 
     msg = AckermannDriveStamped()
     if fit_lineRight_singleframe is None:
