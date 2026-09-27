@@ -70,6 +70,7 @@ RIGHT_BAND_MAX_WIDTH = 80
 RIGHT_OUTWARD_SWITCH_PX = 18.0
 RIGHT_OUTWARD_PARALLEL_SPREAD_PX = 20.0
 RIGHT_PENDING_MATCH_PX = 18.0
+RIGHT_REACQUIRE_FRAMES = 3
 right_edge_close_kernel_size = 3
 right_lane_tracker = {
     'fit': None,
@@ -535,6 +536,27 @@ def clear_pending_right_fit():
     right_lane_tracker['pending_frames'] = 0
 
 
+def remember_pending_right_fit(candidate, sample_rows):
+    """Count consecutive, mutually consistent replacement candidates."""
+    candidate_samples = np.array([
+        evaluate_fit(candidate, row) for row in sample_rows])
+    pending = right_lane_tracker['pending_fit']
+    if pending is not None:
+        pending_samples = np.array([
+            evaluate_fit(pending, row) for row in sample_rows])
+        pending_matches = bool(np.max(np.abs(
+            candidate_samples - pending_samples)) <= RIGHT_PENDING_MATCH_PX)
+    else:
+        pending_matches = False
+
+    if pending_matches:
+        right_lane_tracker['pending_frames'] += 1
+    else:
+        right_lane_tracker['pending_fit'] = candidate.copy()
+        right_lane_tracker['pending_frames'] = 1
+    return right_lane_tracker['pending_frames']
+
+
 def hold_previous_right_fit(reason):
     """Reject a noisy frame and briefly keep the last trusted right line."""
     right_lane_tracker['lost_frames'] += 1
@@ -556,7 +578,9 @@ def update_right_lane_fit(hotpixels, image_height):
         (rows * 10 / image_height).astype(np.int32), 9))
     if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
         clear_pending_right_fit()
-        return hold_previous_right_fit('short_line')
+        reason = 'short_line:%dbins:%dpixels:rows%d-%d' % (
+            vertical_bins.size, rows.size, int(np.min(rows)), int(np.max(rows)))
+        return hold_previous_right_fit(reason)
 
     candidate = polynomial_fit(hotpixels)
     bottom_row = image_height - 1
@@ -573,11 +597,6 @@ def update_right_lane_fit(hotpixels, image_height):
     if previous is not None:
         previous_bottom_x = evaluate_fit(previous, bottom_row)
         previous_far_x = evaluate_fit(previous, far_row)
-        if (abs(bottom_x - previous_bottom_x) > RIGHT_MAX_BOTTOM_JUMP_PX or
-                abs(far_x - previous_far_x) > RIGHT_MAX_FAR_JUMP_PX):
-            clear_pending_right_fit()
-            return hold_previous_right_fit('position_jump')
-
         sample_rows = np.array([
             image_height * 0.50,
             image_height * 0.75,
@@ -596,28 +615,32 @@ def update_right_lane_fit(hotpixels, image_height):
         # it. Genuine bends normally change the sampled shape non-uniformly.
         if (outward_shift > RIGHT_OUTWARD_SWITCH_PX and
                 outward_spread <= RIGHT_OUTWARD_PARALLEL_SPREAD_PX):
-            pending = right_lane_tracker['pending_fit']
-            if pending is not None:
-                pending_samples = np.array([
-                    evaluate_fit(pending, row) for row in sample_rows])
-                pending_matches = bool(np.max(np.abs(
-                    candidate_samples - pending_samples)) <=
-                    RIGHT_PENDING_MATCH_PX)
-            else:
-                pending_matches = False
-
-            if pending_matches:
-                right_lane_tracker['pending_frames'] += 1
-            else:
-                right_lane_tracker['pending_fit'] = candidate.copy()
-                right_lane_tracker['pending_frames'] = 1
+            remember_pending_right_fit(candidate, sample_rows)
 
             # Never let a farther, parallel stripe take over automatically.
             # If the inner stripe is really gone, stopping is safer than
             # interpreting the map border as the lane boundary.
             return hold_previous_right_fit('outward_candidate')
-        else:
+
+        position_jump = (
+            abs(bottom_x - previous_bottom_x) > RIGHT_MAX_BOTTOM_JUMP_PX or
+            abs(far_x - previous_far_x) > RIGHT_MAX_FAR_JUMP_PX)
+        if position_jump:
+            stable_frames = remember_pending_right_fit(candidate, sample_rows)
+            if stable_frames < RIGHT_REACQUIRE_FRAMES:
+                return hold_previous_right_fit('position_jump')
+
+            # The old fit can become permanently stale after a real bend or
+            # after the vehicle is repositioned.  A replacement that remains
+            # geometrically valid and stable for several frames is safe to
+            # acquire, provided it was not the outward parallel map border
+            # rejected above.
+            right_lane_tracker['fit'] = candidate
+            right_lane_tracker['lost_frames'] = 0
             clear_pending_right_fit()
+            return candidate, 'reacquired:position_jump'
+
+        clear_pending_right_fit()
 
         alpha = RIGHT_SMOOTHING_ALPHA
         candidate = {
