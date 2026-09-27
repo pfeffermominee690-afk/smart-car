@@ -64,7 +64,20 @@ RIGHT_MAX_BOTTOM_JUMP_PX = 42.0
 RIGHT_MAX_FAR_JUMP_PX = 54.0
 RIGHT_HOLD_FRAMES = 1
 RIGHT_SMOOTHING_ALPHA = 0.75
-right_lane_tracker = {'fit': None, 'lost_frames': 0}
+RIGHT_SEARCH_HALF_WIDTH = 70
+RIGHT_BAND_MIN_WIDTH = 2
+RIGHT_BAND_MAX_WIDTH = 80
+RIGHT_OUTWARD_SWITCH_PX = 18.0
+RIGHT_OUTWARD_PARALLEL_SPREAD_PX = 20.0
+RIGHT_PENDING_MATCH_PX = 18.0
+right_white_threshold = 170
+right_close_kernel_size = 3
+right_lane_tracker = {
+    'fit': None,
+    'lost_frames': 0,
+    'pending_fit': None,
+    'pending_frames': 0
+}
 debug_images = {}
 debug_images_lock = threading.Lock()
 
@@ -216,23 +229,112 @@ def find_starter_centroids(image,x0,peak_thresh,showMe):
 # if number of histogram pixels in window is below 10,condisder them as noise and does not attempt to get centroid
 
 
+def find_histogram_bands(histogram, min_support):
+    """Return continuous white bands as (centre, start, end, strength)."""
+    active = np.asarray(histogram >= min_support, dtype=np.uint8)
+    padded = np.concatenate((np.zeros(1, dtype=np.uint8), active,
+                             np.zeros(1, dtype=np.uint8)))
+    changes = np.diff(padded.astype(np.int16))
+    starts = np.flatnonzero(changes == 1)
+    ends = np.flatnonzero(changes == -1)
+    bands = []
+    for start, end in zip(starts, ends):
+        width = int(end - start)
+        if width < RIGHT_BAND_MIN_WIDTH or width > RIGHT_BAND_MAX_WIDTH:
+            continue
+        weights = np.asarray(histogram[start:end], dtype=np.float64)
+        strength = float(np.sum(weights))
+        if strength <= 0:
+            continue
+        positions = np.arange(start, end, dtype=np.float64)
+        centre = int(round(np.sum(positions * weights) / strength))
+        bands.append((centre, int(start), int(end), strength))
+    return bands
+
+
 def find_right_starter(image, peak_thresh):
-    """Find the solid right boundary near its expected bird-view position."""
+    """Choose the innermost credible white band in the lower right view."""
     height, width = image.shape[:2]
-    x_min = width / 2
-    x_max = min(width, int(width * 0.98))
-    histogram = np.sum(image[height / 2:height, x_min:x_max], axis=0)
-    if histogram.size == 0 or np.max(histogram) <= peak_thresh:
-        histogram = np.sum(image[:, x_min:x_max], axis=0)
-    if histogram.size == 0 or np.max(histogram) <= peak_thresh:
+    # Use only the nearest part of the view so a curved stripe does not smear
+    # into one very wide histogram band during initialisation.
+    y_min = max(int(height * 0.75), height - 80)
+    histogram = np.count_nonzero(image[y_min:height, :], axis=0)
+    min_support = max(2, int(round((height - y_min) * 0.04)))
+    bands = find_histogram_bands(histogram, min_support)
+    x_min = max(width / 2 + 10, int(round(RIGHT_EXPECTED_X - 120)))
+    x_max = min(width - 1, int(round(RIGHT_EXPECTED_X + 160)))
+    candidates = [band for band in bands
+                  if x_min <= band[0] <= x_max]
+    if not candidates:
         return {'centroid': RIGHT_EXPECTED_X, 'intensity': 0}
 
-    # Pick the strong response closest to the expected right-lane position.
-    strong_threshold = max(float(peak_thresh), float(np.max(histogram)) * 0.35)
-    candidates = np.where(histogram >= strong_threshold)[0] + x_min
-    centroid = int(candidates[np.argmin(np.abs(candidates - RIGHT_EXPECTED_X))])
-    return {'centroid': centroid,
-            'intensity': histogram[centroid - x_min]}
+    # The lane boundary is the first white stripe encountered from the road
+    # interior. The map border is a second stripe farther to the right.
+    selected = min(candidates, key=lambda band: band[0])
+    return {'centroid': selected[0], 'intensity': selected[3]}
+
+
+def run_right_band_window(image, centroid_starter, sliding_window_specs,
+                          showMe=False):
+    """Track one filled white stripe bottom-up with a curvature predictor."""
+    height = int(round(
+        float(image.shape[0]) / sliding_window_specs['n_steps']))
+    hotpixels_log = {'x': [], 'y': []}
+    selected_centres = []
+    expected_x = float(centroid_starter)
+    out_img = None
+    if showMe:
+        out_img = np.dstack((image, image, image)).astype('uint8')
+
+    for step in range(sliding_window_specs['n_steps']):
+        y_end = image.shape[0] - step * height
+        y_start = max(0, y_end - height)
+        if y_end <= y_start:
+            continue
+
+        if len(selected_centres) >= 2:
+            step_delta = selected_centres[-1] - selected_centres[-2]
+            step_delta = max(-RIGHT_SEARCH_HALF_WIDTH,
+                             min(RIGHT_SEARCH_HALF_WIDTH, step_delta))
+            expected_x = selected_centres[-1] + step_delta
+        elif selected_centres:
+            expected_x = selected_centres[-1]
+
+        x_start = max(0, int(round(expected_x - RIGHT_SEARCH_HALF_WIDTH)))
+        x_end = min(image.shape[1],
+                    int(round(expected_x + RIGHT_SEARCH_HALF_WIDTH)) + 1)
+        if x_end <= x_start:
+            continue
+
+        crop = image[y_start:y_end, x_start:x_end]
+        histogram = np.count_nonzero(crop, axis=0)
+        min_support = max(2, int(round((y_end - y_start) * 0.08)))
+        local_bands = find_histogram_bands(histogram, min_support)
+        bands = [(band[0] + x_start, band[1] + x_start,
+                  band[2] + x_start, band[3]) for band in local_bands]
+        if not bands:
+            if showMe:
+                cv2.rectangle(out_img, (x_start, y_start), (x_end, y_end),
+                              (0, 0, 255), 1)
+            continue
+
+        # A stronger outer border must not pull the tracker away from the
+        # predicted stripe. Distance to the tracked identity wins over strength.
+        selected = min(bands, key=lambda band: abs(band[0] - expected_x))
+        centre, band_start, band_end, _ = selected
+        selected_centres.append(float(centre))
+        hot_y, hot_x = np.nonzero(
+            image[y_start:y_end, band_start:band_end])
+        hotpixels_log['x'].extend((hot_y + y_start).tolist())
+        hotpixels_log['y'].extend((hot_x + band_start).tolist())
+
+        if showMe:
+            cv2.rectangle(out_img, (x_start, y_start), (x_end, y_end),
+                          (0, 165, 255), 1)
+            cv2.rectangle(out_img, (band_start, y_start),
+                          (band_end, y_end), (0, 255, 0), 2)
+
+    return hotpixels_log, out_img
 
 
 
@@ -415,6 +517,11 @@ def evaluate_fit(coeffs, row):
     return coeffs['a2'] * row ** 2 + coeffs['a1'] * row + coeffs['a0']
 
 
+def clear_pending_right_fit():
+    right_lane_tracker['pending_fit'] = None
+    right_lane_tracker['pending_frames'] = 0
+
+
 def hold_previous_right_fit(reason):
     """Reject a noisy frame and briefly keep the last trusted right line."""
     right_lane_tracker['lost_frames'] += 1
@@ -429,11 +536,13 @@ def update_right_lane_fit(hotpixels, image_height):
     rows = np.asarray(hotpixels['x'])
     columns = np.asarray(hotpixels['y'])
     if rows.size < RIGHT_MIN_PIXELS:
+        clear_pending_right_fit()
         return hold_previous_right_fit('few_pixels')
 
     vertical_bins = np.unique(np.minimum(
         (rows * 10 / image_height).astype(np.int32), 9))
     if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
+        clear_pending_right_fit()
         return hold_previous_right_fit('short_line')
 
     candidate = polynomial_fit(hotpixels)
@@ -444,6 +553,7 @@ def update_right_lane_fit(hotpixels, image_height):
     if (not np.isfinite(bottom_x) or not np.isfinite(far_x) or
             bottom_x < 640 * 0.45 or bottom_x >= 640 or
             far_x < 220 or far_x >= 640):
+        clear_pending_right_fit()
         return hold_previous_right_fit('bad_geometry')
 
     previous = right_lane_tracker['fit']
@@ -452,7 +562,49 @@ def update_right_lane_fit(hotpixels, image_height):
         previous_far_x = evaluate_fit(previous, far_row)
         if (abs(bottom_x - previous_bottom_x) > RIGHT_MAX_BOTTOM_JUMP_PX or
                 abs(far_x - previous_far_x) > RIGHT_MAX_FAR_JUMP_PX):
+            clear_pending_right_fit()
             return hold_previous_right_fit('position_jump')
+
+        sample_rows = np.array([
+            image_height * 0.50,
+            image_height * 0.75,
+            image_height - 1.0])
+        candidate_samples = np.array([
+            evaluate_fit(candidate, row) for row in sample_rows])
+        previous_samples = np.array([
+            evaluate_fit(previous, row) for row in sample_rows])
+        outward_delta = candidate_samples - previous_samples
+        outward_shift = float(np.median(outward_delta))
+        outward_spread = float(np.max(outward_delta) - np.min(outward_delta))
+
+        # A sudden, nearly parallel shift to the right is characteristic of
+        # switching from the inner lane stripe to the outer map border. Require
+        # the alternative to remain stable for several frames before accepting
+        # it. Genuine bends normally change the sampled shape non-uniformly.
+        if (outward_shift > RIGHT_OUTWARD_SWITCH_PX and
+                outward_spread <= RIGHT_OUTWARD_PARALLEL_SPREAD_PX):
+            pending = right_lane_tracker['pending_fit']
+            if pending is not None:
+                pending_samples = np.array([
+                    evaluate_fit(pending, row) for row in sample_rows])
+                pending_matches = bool(np.max(np.abs(
+                    candidate_samples - pending_samples)) <=
+                    RIGHT_PENDING_MATCH_PX)
+            else:
+                pending_matches = False
+
+            if pending_matches:
+                right_lane_tracker['pending_frames'] += 1
+            else:
+                right_lane_tracker['pending_fit'] = candidate.copy()
+                right_lane_tracker['pending_frames'] = 1
+
+            # Never let a farther, parallel stripe take over automatically.
+            # If the inner stripe is really gone, stopping is safer than
+            # interpreting the map border as the lane boundary.
+            return hold_previous_right_fit('outward_candidate')
+        else:
+            clear_pending_right_fit()
 
         alpha = RIGHT_SMOOTHING_ALPHA
         candidate = {
@@ -463,6 +615,7 @@ def update_right_lane_fit(hotpixels, image_height):
 
     right_lane_tracker['fit'] = candidate
     right_lane_tracker['lost_frames'] = 0
+    clear_pending_right_fit()
     return candidate, 'tracked'
 
 
@@ -583,18 +736,26 @@ def lane_detection(img):
     display(combined_output,'Combined output',color=0)
     mask = np.zeros_like(combined_output)
     vertices = np.array([[(0,200),(0,479),(639,479),(639,200)]],dtype=np.int32)
-    cv2.fillPoly(mask,vertices,1)
-    masked_image = cv2.bitwise_and(combined_output,mask)
-    display(masked_image,'Masked',color=0)
+    cv2.fillPoly(mask,vertices,255)
+
+    # Track the filled white stripe instead of the two Canny sides. This makes
+    # a nearby painted line one band rather than a rectangle of four edges.
+    _, white_mask = cv2.threshold(
+        gray_ex, right_white_threshold, 255, cv2.THRESH_BINARY)
+    cleaned = cv2.bitwise_and(white_mask, mask)
+    display(cleaned,'White lane mask',color=0)
     
     min_sz = 50
     #cleaned =              morphology.remove_small_objects(masked_image.astype('bool'),min_size=min_sz,connectivity=2)
-    cleaned = masked_image
-    display(cleaned,'cleaned',color=0)
-    # original image to bird view (transformation)
-    warped_image = birdView(cleaned*1.0,TRANSFORM_MATRIX['M'])
-    warped_image = cv2.dilate(warped_image, DILATE_KERNEL)
-    warped_image = cv2.erode(warped_image, ERODE_KERNEL)
+    # Keep stripe components separate. The old 15x15 dilation could merge the
+    # lane stripe with the farther map border.
+    warped_image = cv2.warpPerspective(
+        cleaned, TRANSFORM_MATRIX['M'],
+        (cleaned.shape[1], cleaned.shape[0]), flags=cv2.INTER_NEAREST)
+    close_kernel = cv2.getStructuringElement(
+        cv2.MORPH_RECT, (right_close_kernel_size, right_close_kernel_size))
+    warped_image = cv2.morphologyEx(
+        warped_image, cv2.MORPH_CLOSE, close_kernel)
     #pubbrid_view.publish(CvBridge().cv2_to_imgmsg(warped_image))
     display(cleaned,'undistorted',color=0)
     display(warped_image,'BirdViews',color=0)
@@ -617,7 +778,7 @@ def lane_detection(img):
         }
 
     sliding_window_specs = {'width': 60, 'n_steps': 10}
-    log_lineRight, out_img = run_sliding_window(
+    log_lineRight, out_img = run_right_band_window(
         warped_image.copy(), centroid_starter_right['centroid'],
         sliding_window_specs, showMe=showMe)
 
@@ -702,12 +863,24 @@ def detector():
     global pubresult
     global Vehicle_PID
     global show_windows
+    global right_white_threshold
+    global right_close_kernel_size
 
     Vehicle_PID = PID(3,0,0)
     rospy.init_node('camera_cmd4', anonymous=False)
     camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
     show_windows = rospy.get_param('~show_windows', False)
+    right_white_threshold = int(rospy.get_param(
+        '~right_white_threshold', 170))
+    right_white_threshold = max(0, min(255, right_white_threshold))
+    right_close_kernel_size = int(rospy.get_param(
+        '~right_close_kernel_size', 3))
+    right_close_kernel_size = max(1, right_close_kernel_size)
+    if right_close_kernel_size % 2 == 0:
+        right_close_kernel_size += 1
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
+    rospy.loginfo('Right stripe mask: threshold=%d close_kernel=%d',
+                  right_white_threshold, right_close_kernel_size)
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
     pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
