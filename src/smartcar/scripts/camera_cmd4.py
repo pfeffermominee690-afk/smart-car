@@ -65,13 +65,12 @@ RIGHT_MAX_FAR_JUMP_PX = 54.0
 RIGHT_HOLD_FRAMES = 1
 RIGHT_SMOOTHING_ALPHA = 0.75
 RIGHT_SEARCH_HALF_WIDTH = 70
-RIGHT_BAND_MIN_WIDTH = 2
+RIGHT_BAND_MIN_WIDTH = 1
 RIGHT_BAND_MAX_WIDTH = 80
 RIGHT_OUTWARD_SWITCH_PX = 18.0
 RIGHT_OUTWARD_PARALLEL_SPREAD_PX = 20.0
 RIGHT_PENDING_MATCH_PX = 18.0
-right_white_threshold = 170
-right_close_kernel_size = 3
+right_edge_close_kernel_size = 3
 right_lane_tracker = {
     'fit': None,
     'lost_frames': 0,
@@ -244,7 +243,7 @@ def find_starter_centroids(image,x0,peak_thresh,showMe):
 
 
 def find_histogram_bands(histogram, min_support):
-    """Return continuous white bands as (centre, start, end, strength)."""
+    """Return continuous edge bands as (centre, start, end, strength)."""
     active = np.asarray(histogram >= min_support, dtype=np.uint8)
     padded = np.concatenate((np.zeros(1, dtype=np.uint8), active,
                              np.zeros(1, dtype=np.uint8)))
@@ -267,7 +266,7 @@ def find_histogram_bands(histogram, min_support):
 
 
 def find_right_starter(image, peak_thresh):
-    """Choose the innermost credible white band in the lower right view."""
+    """Choose the innermost credible Canny edge in the lower right view."""
     height, width = image.shape[:2]
     # Use only the nearest part of the view so a curved stripe does not smear
     # into one very wide histogram band during initialisation.
@@ -282,15 +281,15 @@ def find_right_starter(image, peak_thresh):
     if not candidates:
         return {'centroid': RIGHT_EXPECTED_X, 'intensity': 0}
 
-    # The lane boundary is the first white stripe encountered from the road
-    # interior. The map border is a second stripe farther to the right.
+    # The lane boundary is the first Canny edge encountered from the road
+    # interior. The opposite side of the paint and map border lie farther right.
     selected = min(candidates, key=lambda band: band[0])
     return {'centroid': selected[0], 'intensity': selected[3]}
 
 
 def run_right_band_window(image, centroid_starter, sliding_window_specs,
                           showMe=False):
-    """Track one filled white stripe bottom-up with a curvature predictor."""
+    """Track one Canny edge bottom-up with a curvature predictor."""
     height = int(round(
         float(image.shape[0]) / sliding_window_specs['n_steps']))
     hotpixels_log = {'x': [], 'y': []}
@@ -752,22 +751,21 @@ def lane_detection(img):
     vertices = np.array([[(0,200),(0,479),(639,479),(639,200)]],dtype=np.int32)
     cv2.fillPoly(mask,vertices,255)
 
-    # Track the filled white stripe instead of the two Canny sides. This makes
-    # a nearby painted line one band rather than a rectangle of four edges.
-    _, white_mask = cv2.threshold(
-        gray_ex, right_white_threshold, 255, cv2.THRESH_BINARY)
-    cleaned = cv2.bitwise_and(white_mask, mask)
-    display(cleaned,'White lane mask',color=0)
+    # Keep Canny as the lane detector because its contrast is reliable under
+    # the current lighting. The tracker selects the innermost edge identity.
+    cleaned = cv2.bitwise_and(combined_output, mask)
+    display(cleaned,'Masked Canny edges',color=0)
     
     min_sz = 50
     #cleaned =              morphology.remove_small_objects(masked_image.astype('bool'),min_size=min_sz,connectivity=2)
-    # Keep stripe components separate. The old 15x15 dilation could merge the
-    # lane stripe with the farther map border.
+    # Keep adjacent Canny edges separate. The old 15x15 dilation could merge
+    # the lane marking with the farther map border.
     warped_image = cv2.warpPerspective(
         cleaned, TRANSFORM_MATRIX['M'],
         (cleaned.shape[1], cleaned.shape[0]), flags=cv2.INTER_NEAREST)
     close_kernel = cv2.getStructuringElement(
-        cv2.MORPH_RECT, (right_close_kernel_size, right_close_kernel_size))
+        cv2.MORPH_RECT,
+        (right_edge_close_kernel_size, right_edge_close_kernel_size))
     warped_image = cv2.morphologyEx(
         warped_image, cv2.MORPH_CLOSE, close_kernel)
     #pubbrid_view.publish(CvBridge().cv2_to_imgmsg(warped_image))
@@ -879,24 +877,20 @@ def detector():
     global pubresult
     global Vehicle_PID
     global show_windows
-    global right_white_threshold
-    global right_close_kernel_size
+    global right_edge_close_kernel_size
 
     Vehicle_PID = PID(3,0,0)
     rospy.init_node('camera_cmd4', anonymous=False)
     camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
     show_windows = rospy.get_param('~show_windows', False)
-    right_white_threshold = int(rospy.get_param(
-        '~right_white_threshold', 170))
-    right_white_threshold = max(0, min(255, right_white_threshold))
-    right_close_kernel_size = int(rospy.get_param(
-        '~right_close_kernel_size', 3))
-    right_close_kernel_size = max(1, right_close_kernel_size)
-    if right_close_kernel_size % 2 == 0:
-        right_close_kernel_size += 1
+    right_edge_close_kernel_size = int(rospy.get_param(
+        '~right_edge_close_kernel_size', 3))
+    right_edge_close_kernel_size = max(1, right_edge_close_kernel_size)
+    if right_edge_close_kernel_size % 2 == 0:
+        right_edge_close_kernel_size += 1
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
-    rospy.loginfo('Right stripe mask: threshold=%d close_kernel=%d',
-                  right_white_threshold, right_close_kernel_size)
+    rospy.loginfo('Right Canny-edge close kernel: %d',
+                  right_edge_close_kernel_size)
     pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
     pubresult = rospy.Publisher(
         '/camera_cmd4/trajectory/compressed', CompressedImage, queue_size=1)
