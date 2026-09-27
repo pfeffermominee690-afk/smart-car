@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from collections import deque
 import rospy
 from std_msgs.msg import String
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from ackermann_msgs.msg import AckermannDriveStamped
 from laser_test.msg import laser_control
@@ -87,6 +87,20 @@ def show_cv_window(title, image):
     if show_windows and title == 'result':
         with debug_images_lock:
             debug_images[title] = image.copy()
+
+
+def publish_trajectory_view(image):
+    """Publish the processed camera view only while a remote viewer exists."""
+    if pubresult.get_num_connections() <= 0:
+        return
+    encoded_ok, encoded_image = cv2.imencode(
+        '.jpg', image, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
+    if encoded_ok:
+        debug_msg = CompressedImage()
+        debug_msg.header.stamp = rospy.Time.now()
+        debug_msg.format = 'jpeg'
+        debug_msg.data = encoded_image.tostring()
+        pubresult.publish(debug_msg)
 
 
 def run_debug_window_loop():
@@ -791,6 +805,7 @@ def lane_detection(img):
         cv2.putText(result, 'RIGHT LANE LOST - STOP', (50, 60),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
         show_cv_window('result', result)
+        publish_trajectory_view(result)
         msg.drive.speed = 0.0
         msg.drive.steering_angle = 0.0
         pub.publish(msg)
@@ -825,6 +840,7 @@ def lane_detection(img):
     cv2.putText(result, 'Offset: ' + str(round(offset, 3)) + 'm', (30, 75),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
     show_cv_window('result', result)
+    publish_trajectory_view(result)
 
     print('right_lane_status', tracking_status)
     print('right_lane_pixels', len(log_lineRight['x']))
@@ -881,9 +897,11 @@ def detector():
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
     rospy.loginfo('Right stripe mask: threshold=%d close_kernel=%d',
                   right_white_threshold, right_close_kernel_size)
+    pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
+    pubresult = rospy.Publisher(
+        '/camera_cmd4/trajectory/compressed', CompressedImage, queue_size=1)
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
-    pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
     if show_windows:
         run_debug_window_loop()
     else:
