@@ -19,7 +19,7 @@ import time
 global x0 
 x0 = 1
 global peak_thresh
-peak_thresh = 50 
+peak_thresh = 10
 global n 
 n = 0
 global laser_cmd
@@ -37,17 +37,31 @@ distortionCoe = np.array([-0.41251110946304526,
                           -0.2652600879338458])
 
 showMe = 0
-show_windows = True
+show_windows = False
 
-# The bird-view destination maps the 60 cm lane to x=70..570.
+# Keep camera geometry and preprocessing parameters aligned with camera_cmd3.
+FRAME_SIZE = (640, 480)
+SRC_PTS = np.float32([[286,285],[117,378],[559,380],[388,285]])
+DST_PTS = np.float32([[170,0],[170,480],[470,480],[470,0]])
+TRANSFORM_MATRIX = {
+    'M': cv2.getPerspectiveTransform(SRC_PTS, DST_PTS),
+    'Minv': cv2.getPerspectiveTransform(DST_PTS, SRC_PTS)
+}
+UNDISTORT_MAP1, UNDISTORT_MAP2 = cv2.initUndistortRectifyMap(
+    intrinsicMat, distortionCoe, None, intrinsicMat, FRAME_SIZE, cv2.CV_16SC2)
+DILATE_KERNEL = np.ones((15,15), np.uint8)
+ERODE_KERNEL = np.ones((7,7), np.uint8)
+
+# The bird-view destination maps the 60 cm lane to x=170..470.
 # Follow only the solid right boundary and infer the lane centre 30 cm left of it.
-LANE_WIDTH_PX = 500.0
+LANE_WIDTH_PX = 300.0
 HALF_LANE_WIDTH_PX = LANE_WIDTH_PX / 2.0
-RIGHT_EXPECTED_X = 570
-RIGHT_MIN_PIXELS = 300
+RIGHT_EXPECTED_X = 470
+RIGHT_MIN_PIXELS = 200
 RIGHT_MIN_VERTICAL_BINS = 6
-RIGHT_MAX_BOTTOM_JUMP_PX = 70.0
-RIGHT_MAX_FAR_JUMP_PX = 90.0
+# Preserve the same physical jump tolerance after changing 500 px to 300 px.
+RIGHT_MAX_BOTTOM_JUMP_PX = 42.0
+RIGHT_MAX_FAR_JUMP_PX = 54.0
 RIGHT_HOLD_FRAMES = 1
 RIGHT_SMOOTHING_ALPHA = 0.75
 right_lane_tracker = {'fit': None, 'lost_frames': 0}
@@ -555,7 +569,7 @@ def image_process(img):
     return skel
 def lane_detection(img):
     
-    corr_img = cv2.undistort(img, intrinsicMat, distortionCoe, None, intrinsicMat)
+    corr_img = cv2.remap(img, UNDISTORT_MAP1, UNDISTORT_MAP2, cv2.INTER_LINEAR)
     #cv2.imwrite('000.jpg',corr_img)
     gray_ex = cv2.cvtColor(corr_img,cv2.COLOR_RGB2GRAY)
     display(gray_ex,'Apply Camera Correction',color=0)
@@ -568,8 +582,8 @@ def lane_detection(img):
     #combined_output = image_process(gray_ex)
     display(combined_output,'Combined output',color=0)
     mask = np.zeros_like(combined_output)
-    vertices = np.array([[(190,205),(0,340),(639,340),(450,205)]],dtype=np.int32)
-    cv2.fillPoly(mask,vertices,255)
+    vertices = np.array([[(0,200),(0,479),(639,479),(639,200)]],dtype=np.int32)
+    cv2.fillPoly(mask,vertices,1)
     masked_image = cv2.bitwise_and(combined_output,mask)
     display(masked_image,'Masked',color=0)
     
@@ -578,12 +592,9 @@ def lane_detection(img):
     cleaned = masked_image
     display(cleaned,'cleaned',color=0)
     # original image to bird view (transformation)
-    src_pts = np.float32([[190,205],[0,340],[639,340],[450,205]])
-    dst_pts = np.float32([[70,0],[70,480],[570,480],[570,0]])
-    transform_matrix = perspective_transform(src_pts,dst_pts)
-    warped_image = birdView(cleaned*1.0,transform_matrix['M'])
-    warped_image = cv2.dilate(warped_image, np.ones((15,15), np.uint8))
-    warped_image = cv2.erode(warped_image, np.ones((7,7), np.uint8))
+    warped_image = birdView(cleaned*1.0,TRANSFORM_MATRIX['M'])
+    warped_image = cv2.dilate(warped_image, DILATE_KERNEL)
+    warped_image = cv2.erode(warped_image, ERODE_KERNEL)
     #pubbrid_view.publish(CvBridge().cv2_to_imgmsg(warped_image))
     display(cleaned,'undistorted',color=0)
     display(warped_image,'BirdViews',color=0)
@@ -605,7 +616,7 @@ def lane_detection(img):
             'intensity': 1
         }
 
-    sliding_window_specs = {'width': 80, 'n_steps': 10}
+    sliding_window_specs = {'width': 60, 'n_steps': 10}
     log_lineRight, out_img = run_sliding_window(
         warped_image.copy(), centroid_starter_right['centroid'],
         sliding_window_specs, showMe=showMe)
@@ -645,7 +656,7 @@ def lane_detection(img):
     cv2.line(color_wrap, (corr_img.shape[1] / 2, corr_img.shape[0] - 35),
              (corr_img.shape[1] / 2, corr_img.shape[0] - 5), (0, 0, 255), 5)
     newwrap = cv2.warpPerspective(
-        color_wrap, transform_matrix['Minv'],
+        color_wrap, TRANSFORM_MATRIX['Minv'],
         (corr_img.shape[1], corr_img.shape[0]))
     result = cv2.addWeighted(corr_img, 1, newwrap, 0.8, 0)
     cv2.putText(result, 'Right lane: ' + tracking_status, (30, 40),
@@ -657,7 +668,7 @@ def lane_detection(img):
     print('right_lane_status', tracking_status)
     print('right_lane_pixels', len(log_lineRight['x']))
     print('offset ', offset)
-    msg.drive.speed = -30
+    msg.drive.speed = -37
     # Keep the existing lateral controller; only its lane centre source changed.
     Vehicle_PID.update(offset)
     steering_command = -Vehicle_PID.output * 40.0
@@ -695,8 +706,7 @@ def detector():
     Vehicle_PID = PID(3,0,0)
     rospy.init_node('camera_cmd4', anonymous=False)
     camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
-    show_windows = rospy.get_param(
-        '~show_windows', bool(os.environ.get('DISPLAY')))
+    show_windows = rospy.get_param('~show_windows', False)
     rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
     rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
