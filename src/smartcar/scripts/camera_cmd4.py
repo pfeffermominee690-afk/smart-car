@@ -73,12 +73,23 @@ RIGHT_PENDING_MATCH_PX = 18.0
 RIGHT_REACQUIRE_FRAMES = 3
 RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES = 3
 RIGHT_GLOBAL_REACQUIRE_FRAMES = 3
+# Do not move until the same innermost right line has been seen repeatedly.
+RIGHT_INITIAL_CONFIRM_FRAMES = 5
+RIGHT_INITIAL_MAX_BOTTOM_X = 480.0
+# Compare every accepted candidate with the independently stored inner-line
+# identity.  This catches gradual frame-to-frame drift to the outer map edge.
+RIGHT_TRUSTED_OUTWARD_LIMIT_PX = 10.0
 right_edge_close_kernel_size = 3
 right_lane_tracker = {
     'fit': None,
+    'trusted_fit': None,
     'lost_frames': 0,
     'pending_fit': None,
-    'pending_frames': 0
+    'pending_frames': 0,
+    'force_global_search': False,
+    'last_speed': 0.0,
+    'last_steering': 0.0,
+    'has_trusted_command': False
 }
 debug_images = {}
 debug_images_lock = threading.Lock()
@@ -354,8 +365,9 @@ def run_right_band_window(image, centroid_starter, sliding_window_specs,
 
 
 def starter_candidate_geometry(hotpixels, image_height):
-    """Return a valid starter fit and its near/far positions, or None."""
+    """Return a valid starter fit and observed/fitted positions, or None."""
     rows = np.asarray(hotpixels['x'])
+    columns = np.asarray(hotpixels['y'])
     if rows.size < RIGHT_MIN_PIXELS:
         return None
     vertical_bins = np.unique(np.minimum(
@@ -370,7 +382,11 @@ def starter_candidate_geometry(hotpixels, image_height):
             bottom_x < 350 or bottom_x >= 640 or
             far_x < 220 or far_x >= 640):
         return None
-    return candidate, float(bottom_x), float(far_x)
+    near_columns = columns[rows >= int(image_height * 0.85)]
+    if near_columns.size == 0:
+        return None
+    observed_near_x = float(np.median(near_columns))
+    return candidate, float(bottom_x), float(far_x), observed_near_x
 
 
 def find_innermost_right_track(image, sliding_window_specs):
@@ -387,8 +403,9 @@ def find_innermost_right_track(image, sliding_window_specs):
         geometry = starter_candidate_geometry(hotpixels, image.shape[0])
         if geometry is None:
             continue
-        candidate, bottom_x, far_x = geometry
-        valid_tracks.append((bottom_x, far_x, candidate, hotpixels, starter))
+        candidate, bottom_x, far_x, observed_near_x = geometry
+        valid_tracks.append((observed_near_x, bottom_x, far_x,
+                             candidate, hotpixels, starter))
 
     if not valid_tracks:
         rospy.logwarn_throttle(
@@ -401,9 +418,11 @@ def find_innermost_right_track(image, sliding_window_specs):
     # and vertical-coverage checks, so the left dashed lane is excluded.
     selected = min(valid_tracks, key=lambda item: item[0])
     rospy.loginfo_throttle(
-        1.0, 'Global right search: %d tracks, inner bottom=%.1f far=%.1f start=%d',
-        len(valid_tracks), selected[0], selected[1], selected[4])
-    return selected[3]
+        1.0,
+        'Global right search: %d tracks, inner observed=%.1f bottom=%.1f '
+        'far=%.1f start=%d',
+        len(valid_tracks), selected[0], selected[1], selected[2], selected[5])
+    return selected[4]
 
 
 
@@ -613,12 +632,37 @@ def remember_pending_right_fit(candidate, sample_rows):
 
 
 def hold_previous_right_fit(reason):
-    """Reject a noisy frame and briefly keep the last trusted right line."""
+    """Reject a frame without letting its pixels alter the trusted command."""
     right_lane_tracker['lost_frames'] += 1
-    previous = right_lane_tracker['fit']
-    if previous is not None and right_lane_tracker['lost_frames'] <= RIGHT_HOLD_FRAMES:
-        return previous, 'held:' + reason
+    right_lane_tracker['force_global_search'] = True
     return None, 'lost:' + reason
+
+
+def fit_samples(fit, image_height):
+    sample_rows = np.array([
+        image_height * 0.50,
+        image_height * 0.75,
+        image_height - 1.0])
+    return sample_rows, np.array([
+        evaluate_fit(fit, row) for row in sample_rows])
+
+
+def candidate_moves_to_outer(candidate, image_height):
+    """Reject a cumulative, near-parallel move away from the road interior."""
+    trusted = right_lane_tracker['trusted_fit']
+    if trusted is None:
+        return False, 0.0, 0.0, 0.0
+    sample_rows, candidate_samples = fit_samples(candidate, image_height)
+    unused, trusted_samples = fit_samples(trusted, image_height)
+    outward_delta = candidate_samples - trusted_samples
+    outward_min = float(np.min(outward_delta))
+    outward_shift = float(np.median(outward_delta))
+    outward_spread = float(np.max(outward_delta) - np.min(outward_delta))
+    rejected = bool(
+        outward_min > RIGHT_TRUSTED_OUTWARD_LIMIT_PX or
+        (outward_shift > RIGHT_TRUSTED_OUTWARD_LIMIT_PX and
+         outward_spread <= RIGHT_OUTWARD_PARALLEL_SPREAD_PX))
+    return rejected, outward_min, outward_shift, outward_spread
 
 
 def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
@@ -649,17 +693,48 @@ def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
         return hold_previous_right_fit('bad_geometry')
 
     previous = right_lane_tracker['fit']
+    trusted = right_lane_tracker['trusted_fit']
+
+    # At startup there is no safe command to preserve.  Confirm the same
+    # conservative inner candidate for several frames before accepting it.
+    if trusted is None:
+        sample_rows, unused = fit_samples(candidate, image_height)
+        if bottom_x > RIGHT_INITIAL_MAX_BOTTOM_X:
+            clear_pending_right_fit()
+            return hold_previous_right_fit('initial_outer_candidate')
+        stable_frames = remember_pending_right_fit(candidate, sample_rows)
+        if stable_frames < RIGHT_INITIAL_CONFIRM_FRAMES:
+            right_lane_tracker['force_global_search'] = True
+            right_lane_tracker['lost_frames'] += 1
+            return None, 'initializing:%d/%d' % (
+                stable_frames, RIGHT_INITIAL_CONFIRM_FRAMES)
+        right_lane_tracker['fit'] = candidate
+        right_lane_tracker['trusted_fit'] = candidate.copy()
+        right_lane_tracker['lost_frames'] = 0
+        right_lane_tracker['force_global_search'] = False
+        clear_pending_right_fit()
+        return candidate, 'initialized'
+
+    (outer_candidate, trusted_outward_min, trusted_outward_shift,
+     trusted_outward_spread) = candidate_moves_to_outer(
+         candidate, image_height)
+    if outer_candidate:
+        rospy.logwarn_throttle(
+            1.0, 'Reject outer-line drift: min=%.1f shift=%.1f spread=%.1f',
+            trusted_outward_min, trusted_outward_shift,
+            trusted_outward_spread)
+        return hold_previous_right_fit('outer_identity')
+
     if global_reacquire and previous is not None:
-        sample_rows = np.array([
-            image_height * 0.50,
-            image_height * 0.75,
-            image_height - 1.0])
+        sample_rows, unused = fit_samples(candidate, image_height)
         stable_frames = remember_pending_right_fit(candidate, sample_rows)
         if stable_frames < RIGHT_GLOBAL_REACQUIRE_FRAMES:
             return hold_previous_right_fit('global_candidate')
 
         right_lane_tracker['fit'] = candidate
+        right_lane_tracker['trusted_fit'] = candidate.copy()
         right_lane_tracker['lost_frames'] = 0
+        right_lane_tracker['force_global_search'] = False
         clear_pending_right_fit()
         return candidate, 'reacquired:global_search'
 
@@ -705,7 +780,9 @@ def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
             # acquire, provided it was not the outward parallel map border
             # rejected above.
             right_lane_tracker['fit'] = candidate
+            right_lane_tracker['trusted_fit'] = candidate.copy()
             right_lane_tracker['lost_frames'] = 0
+            right_lane_tracker['force_global_search'] = False
             clear_pending_right_fit()
             return candidate, 'reacquired:position_jump'
 
@@ -719,7 +796,13 @@ def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
         }
 
     right_lane_tracker['fit'] = candidate
+    # Small parallel outward movements do not move the identity anchor.  Thus
+    # several small steps cannot accumulate into an outer-border switch.
+    if previous is None or trusted_outward_shift <= 0.0 or \
+            trusted_outward_spread > RIGHT_OUTWARD_PARALLEL_SPREAD_PX:
+        right_lane_tracker['trusted_fit'] = candidate.copy()
     right_lane_tracker['lost_frames'] = 0
+    right_lane_tracker['force_global_search'] = False
     clear_pending_right_fit()
     return candidate, 'tracked'
 
@@ -872,11 +955,14 @@ def lane_detection(img):
     showMe = 0
     previous_fit = right_lane_tracker['fit']
     sliding_window_specs = {'width': 60, 'n_steps': 10}
-    global_reacquire = (
+    global_reacquire = bool(
         previous_fit is not None and
-        right_lane_tracker['lost_frames'] >=
-        RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES)
-    if previous_fit is None or global_reacquire:
+        (right_lane_tracker['force_global_search'] or
+         right_lane_tracker['lost_frames'] >=
+         RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES))
+    if (previous_fit is None or
+            right_lane_tracker['trusted_fit'] is None or
+            global_reacquire):
         log_lineRight = find_innermost_right_track(
             warped_image, sliding_window_specs)
     else:
@@ -897,14 +983,24 @@ def lane_detection(img):
     msg = AckermannDriveStamped()
     if fit_lineRight_singleframe is None:
         result = corr_img.copy()
-        cv2.putText(result, 'RIGHT LANE LOST - STOP', (50, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        if right_lane_tracker['has_trusted_command']:
+            message = 'INNER LANE LOST - HOLD LAST'
+            msg.drive.speed = right_lane_tracker['last_speed']
+            msg.drive.steering_angle = right_lane_tracker['last_steering']
+        else:
+            message = 'WAITING FOR INNER LANE'
+            msg.drive.speed = 0.0
+            msg.drive.steering_angle = 0.0
+        cv2.putText(result, message, (35, 60),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+        cv2.putText(result, tracking_status, (35, 95),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
         show_cv_window('result', result)
         publish_trajectory_view(result)
-        msg.drive.speed = 0.0
-        msg.drive.steering_angle = 0.0
         pub.publish(msg)
-        rospy.logwarn_throttle(1.0, 'Right lane rejected: %s', tracking_status)
+        rospy.logwarn_throttle(
+            1.0, 'Right lane rejected: %s; command speed=%.1f steering=%.2f',
+            tracking_status, msg.drive.speed, msg.drive.steering_angle)
         return
 
     ym_per_pix = 0.6 / 480.0
@@ -945,6 +1041,9 @@ def lane_detection(img):
     Vehicle_PID.update(offset)
     steering_command = -Vehicle_PID.output * 40.0
     msg.drive.steering_angle = max(-25.0, min(25.0, steering_command))
+    right_lane_tracker['last_speed'] = msg.drive.speed
+    right_lane_tracker['last_steering'] = msg.drive.steering_angle
+    right_lane_tracker['has_trusted_command'] = True
     print('steering_angle', msg.drive.steering_angle)
     pub.publish(msg)
 
