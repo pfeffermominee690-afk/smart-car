@@ -757,32 +757,30 @@ class CameraLaneAvoidance(object):
             '~intersection_result_timeout', 0.6, 0.2, 2.0)
         self.intersection_require_scan = bool(rospy.get_param(
             '~intersection_require_scan', False))
+        # Keep forward traffic-sign maneuvers at the same speed as normal
+        # lane following.  The lane speed is the single source of truth.
+        intersection_forward_speed = self.tracker.lane_speed
         intersection_config = {
             'enabled': self.intersection_control_enabled,
-            'approach_speed': self.bounded_param(
-                '~intersection_approach_speed', -10.0, -20.0, -3.0),
+            'approach_speed': intersection_forward_speed,
             'approach_timeout': self.bounded_param(
                 '~intersection_approach_timeout', 2.0, 0.3, 4.0),
             'blue_clear_frames': max(1, min(10, int(rospy.get_param(
                 '~blue_clear_frames', 2)))),
-            'straight_speed': self.bounded_param(
-                '~straight_speed', -12.0, -20.0, -3.0),
+            'straight_speed': intersection_forward_speed,
             'straight_duration': self.bounded_param(
                 '~straight_duration', 1.0, 0.1, 4.0),
-            'right_speed': self.bounded_param(
-                '~right_speed', -12.0, -20.0, -3.0),
+            'right_speed': intersection_forward_speed,
             'right_angle': self.bounded_param(
                 '~right_angle', -18.0, -25.0, -3.0),
             'right_duration': self.bounded_param(
                 '~right_duration', 1.5, 0.1, 4.0),
-            'left_speed': self.bounded_param(
-                '~left_speed', -12.0, -20.0, -3.0),
+            'left_speed': intersection_forward_speed,
             'left_angle': self.bounded_param(
                 '~left_angle', 16.0, 3.0, 25.0),
             'left_duration': self.bounded_param(
                 '~left_duration', 1.5, 0.1, 4.0),
-            'uturn_forward_speed': self.bounded_param(
-                '~uturn_forward_speed', -10.0, -20.0, -3.0),
+            'uturn_forward_speed': intersection_forward_speed,
             'uturn_forward_angle': self.bounded_param(
                 '~uturn_forward_angle', 20.0, 3.0, 25.0),
             'uturn_forward_duration': self.bounded_param(
@@ -793,8 +791,7 @@ class CameraLaneAvoidance(object):
                 '~uturn_reverse_angle', -20.0, -25.0, -3.0),
             'uturn_reverse_duration': self.bounded_param(
                 '~uturn_reverse_duration', 0.8, 0.1, 4.0),
-            'uturn_exit_speed': self.bounded_param(
-                '~uturn_exit_speed', -10.0, -20.0, -3.0),
+            'uturn_exit_speed': intersection_forward_speed,
             'uturn_exit_angle': self.bounded_param(
                 '~uturn_exit_angle', 18.0, 3.0, 25.0),
             'uturn_exit_duration': self.bounded_param(
