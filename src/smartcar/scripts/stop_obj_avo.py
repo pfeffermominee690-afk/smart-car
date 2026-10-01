@@ -96,6 +96,7 @@ showMe = 0
 blue_debug_pub = None
 blue_debug_rate = 8.0
 last_blue_debug_publish = 0.0
+blue_debug_only = False
 
 
 #net = jetson.inference.imageNet("resnet-18",labels="labels.txt")
@@ -651,10 +652,23 @@ def front_camera_callback(data):
     global now_signal
     global wanpai
     global turn_right_angle
+    global blue_debug_only
     
     threshold=100
     time1=time.time()
     img = CvBridge().imgmsg_to_cv2(data, "bgr8")
+
+    # Safe bench-test mode: run only the blue-line detector and its annotated
+    # image publisher.  No sign recognition, state transition, or drive command
+    # is executed while this private ROS parameter is enabled.
+    if blue_debug_only:
+        blue_point,line_k,mid_x,mid_y,leng = blue_line(img, data.header)
+        rospy.loginfo_throttle(
+            1.0,
+            'Blue debug only: pixels=%d leng=%d mid=(%.1f, %.1f) angle=%.1f',
+            blue_point, leng, mid_x, mid_y,
+            np.arctan(line_k)*180/np.pi)
+        return
     
     if laser_cmd == False:
         if mode == 0:#识别蓝线
@@ -1768,10 +1782,12 @@ def detector():
     global pubmode
     global blue_debug_pub
     global blue_debug_rate
+    global blue_debug_only
     # global Vehicle_PID
     # global Reverse_PID
     rospy.init_node('stop_obj', anonymous=False)
     blue_debug_rate = max(0.0, float(rospy.get_param('~blue_debug_rate', 8.0)))
+    blue_debug_only = bool(rospy.get_param('~blue_debug_only', False))
     rospy.Subscriber("/usb_cam_2/image", Image, front_camera_callback, queue_size=1, buff_size=2**24)
     # rospy.Subscriber("/usb_cam_1/image", Image, rear_camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", LaserControl, laser_callback, queue_size=1)
@@ -1784,6 +1800,8 @@ def detector():
         '/stop_obj/blue_line/compressed', CompressedImage, queue_size=1)
     rospy.loginfo('Blue-line debug: /stop_obj/blue_line/compressed at %.1f Hz max',
                   blue_debug_rate)
+    if blue_debug_only:
+        rospy.logwarn('BLUE DEBUG ONLY: image processing enabled; control logic disabled')
     rospy.spin()
 
 if __name__ == '__main__':
