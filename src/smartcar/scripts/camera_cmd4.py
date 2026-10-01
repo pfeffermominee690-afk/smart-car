@@ -661,6 +661,11 @@ class PassiveIntersectionPerception(object):
             color = (0, 255, 0) if sign['class_id'] is not None else (0, 255, 255)
             cv2.rectangle(
                 overlay, (x, y), (x+width, y+height), color, 3)
+            cv2.putText(
+                overlay, '%s %.3f' %
+                (sign['name'].upper(), sign['confidence']),
+                (x, max(25, y-8)), cv2.FONT_HERSHEY_SIMPLEX,
+                0.8, color, 2)
         stable_name = (
             'none' if stable_sign is None else self.SIGN_NAMES[stable_sign])
         self.draw_text(overlay, 'PASSIVE INTERSECTION PERCEPTION', 0,
@@ -672,7 +677,7 @@ class PassiveIntersectionPerception(object):
             1, (0, 0, 255) if blue['confirmed'] else (255, 255, 255))
         self.draw_text(
             overlay, 'SIGN raw=%s %.3f stable=%s' %
-            (raw_name, confidence, stable_name),
+            (raw_name.upper(), confidence, stable_name.upper()),
             2, (0, 255, 0) if stable_sign is not None else (255, 255, 255))
         self.draw_text(overlay, 'NO CONTROL EFFECT', 3, (0, 255, 255))
 
@@ -697,8 +702,11 @@ class CameraLaneAvoidance(object):
         self.scan_topic = rospy.get_param('~scan_topic', '/scan')
         self.output_topic = rospy.get_param(
             '~output_topic', '/ackermann_cmd')
-        self.intersection_enabled = bool(rospy.get_param(
-            '~enable_intersection_perception', False))
+        self.perception_only = bool(rospy.get_param(
+            '~perception_only', False))
+        self.intersection_enabled = (
+            self.perception_only or bool(rospy.get_param(
+                '~enable_intersection_perception', False)))
         self.intersection_rate = max(
             0.2, float(rospy.get_param('~intersection_rate', 5.0)))
         self.intersection = (
@@ -782,16 +790,21 @@ class CameraLaneAvoidance(object):
         self.front_points = 0
         self.side_points = 0
 
-        self.cmd_pub = rospy.Publisher(
-            self.output_topic, AckermannDriveStamped, queue_size=1)
-        self.trajectory_pub = rospy.Publisher(
-            '/camera_cmd4/trajectory/compressed',
-            CompressedImage, queue_size=1)
-        self.bird_pub = rospy.Publisher(
-            '/camera_cmd4/bird/compressed',
-            CompressedImage, queue_size=1)
-        self.status_pub = rospy.Publisher(
-            '/camera_cmd4/status', String, queue_size=1)
+        self.cmd_pub = None
+        self.trajectory_pub = None
+        self.bird_pub = None
+        self.status_pub = None
+        if not self.perception_only:
+            self.cmd_pub = rospy.Publisher(
+                self.output_topic, AckermannDriveStamped, queue_size=1)
+            self.trajectory_pub = rospy.Publisher(
+                '/camera_cmd4/trajectory/compressed',
+                CompressedImage, queue_size=1)
+            self.bird_pub = rospy.Publisher(
+                '/camera_cmd4/bird/compressed',
+                CompressedImage, queue_size=1)
+            self.status_pub = rospy.Publisher(
+                '/camera_cmd4/status', String, queue_size=1)
         self.intersection_image_pub = rospy.Publisher(
             '/camera_cmd4/intersection/compressed',
             CompressedImage, queue_size=1)
@@ -801,15 +814,18 @@ class CameraLaneAvoidance(object):
         self.image_sub = rospy.Subscriber(
             self.camera_topic, Image,
             self.camera_callback, queue_size=1, buff_size=2**24)
-        self.scan_sub = rospy.Subscriber(
-            self.scan_topic, LaserScan,
-            self.scan_callback, queue_size=1)
-        self.reset_sub = rospy.Subscriber(
-            '/camera_cmd4/reset', Bool,
-            self.reset_callback, queue_size=1)
-
-        self.timer = rospy.Timer(
-            rospy.Duration(0.05), self.control_timer)
+        self.scan_sub = None
+        self.reset_sub = None
+        self.timer = None
+        if not self.perception_only:
+            self.scan_sub = rospy.Subscriber(
+                self.scan_topic, LaserScan,
+                self.scan_callback, queue_size=1)
+            self.reset_sub = rospy.Subscriber(
+                '/camera_cmd4/reset', Bool,
+                self.reset_callback, queue_size=1)
+            self.timer = rospy.Timer(
+                rospy.Duration(0.05), self.control_timer)
         rospy.on_shutdown(self.shutdown)
         if self.intersection_enabled:
             self.intersection_thread = threading.Thread(
@@ -821,10 +837,14 @@ class CameraLaneAvoidance(object):
                 stream.write('ready\n')
         rospy.loginfo(
             'camera_cmd4 ready: camera=%s scan=%s output=%s avoid_left=%s '
-            'passive_intersection=%s',
+            'passive_intersection=%s perception_only=%s',
             self.camera_topic, self.scan_topic,
             self.output_topic, self.avoid_left,
-            self.intersection_enabled)
+            self.intersection_enabled, self.perception_only)
+        if self.perception_only:
+            rospy.logwarn(
+                'PERCEPTION ONLY: no drive publisher, LiDAR subscriber, lane '
+                'controller, or control timer was created')
 
     def transition(self, state, reason):
         if self.state == state:
@@ -948,6 +968,8 @@ class CameraLaneAvoidance(object):
                 raise ValueError(
                     'Calibration requires a 640x480 image')
             self.queue_intersection_frame(frame, message.header)
+            if self.perception_only:
+                return
             with self.tracker_lock:
                 result, overlay, bird = self.tracker.detect(
                     frame, stamp)
@@ -1231,8 +1253,9 @@ class CameraLaneAvoidance(object):
             self.intersection_stopping = True
             self.intersection_pending = None
             self.intersection_condition.notifyAll()
-        with self.lock:
-            self.cmd_pub.publish(self.make_command())
+        if self.cmd_pub is not None:
+            with self.lock:
+                self.cmd_pub.publish(self.make_command())
         if (self.intersection_thread is not None and
                 self.intersection_thread.is_alive()):
             self.intersection_thread.join(1.0)
