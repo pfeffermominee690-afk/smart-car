@@ -499,7 +499,7 @@ class PassiveIntersectionPerception(object):
         self.sign_threshold = float(rospy.get_param(
             '~sign_match_threshold', 0.95))
         self.uturn_sign_threshold = float(rospy.get_param(
-            '~uturn_sign_match_threshold', 0.92))
+            '~uturn_sign_match_threshold', 0.90))
         rospy.loginfo(
             'Traffic-sign thresholds: default=%.3f uturn=%.3f',
             self.sign_threshold, self.uturn_sign_threshold)
