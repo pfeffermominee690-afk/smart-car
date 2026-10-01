@@ -20,6 +20,8 @@ from cv_bridge import CvBridge
 from sensor_msgs.msg import Image, CompressedImage, LaserScan
 from std_msgs.msg import Bool, String
 
+from intersection_control import IntersectionController
+
 
 class LanePID(object):
     def __init__(self, proportional_gain=2.5):
@@ -523,6 +525,10 @@ class PassiveIntersectionPerception(object):
             image, text, (18, 32+line*30), cv2.FONT_HERSHEY_SIMPLEX,
             0.65, color, 2)
 
+    def reset_sign_votes(self):
+        self.sign_votes.clear()
+        self.stable_sign = None
+
     def detect_blue(self, corrected, overlay):
         small = cv2.resize(corrected, (96, 128))
         height, width = small.shape[:2]
@@ -690,8 +696,6 @@ class PassiveIntersectionPerception(object):
             overlay, 'SIGN raw=%s %.3f stable=%s' %
             (raw_name.upper(), confidence, stable_name.upper()),
             2, (0, 255, 0) if stable_sign is not None else (255, 255, 255))
-        self.draw_text(overlay, 'NO CONTROL EFFECT', 3, (0, 255, 255))
-
         return ({
             'passive_only': True,
             'capture_stamp': float(stamp),
@@ -702,6 +706,16 @@ class PassiveIntersectionPerception(object):
 
 
 class CameraLaneAvoidance(object):
+    @staticmethod
+    def bounded_param(name, default, minimum, maximum):
+        value = float(rospy.get_param(name, default))
+        bounded = max(float(minimum), min(float(maximum), value))
+        if bounded != value:
+            rospy.logwarn(
+                'Clamped unsafe parameter %s from %.3f to %.3f',
+                name, value, bounded)
+        return bounded
+
     def __init__(self, ready_file=None):
         self.lock = threading.RLock()
         self.tracker_lock = threading.Lock()
@@ -715,8 +729,14 @@ class CameraLaneAvoidance(object):
             '~output_topic', '/ackermann_cmd')
         self.perception_only = bool(rospy.get_param(
             '~perception_only', False))
+        self.intersection_control_requested = bool(rospy.get_param(
+            '~enable_intersection_control', False))
+        self.intersection_control_enabled = (
+            self.intersection_control_requested and
+            not self.perception_only)
         self.intersection_enabled = (
-            self.perception_only or bool(rospy.get_param(
+            self.perception_only or self.intersection_control_requested or
+            bool(rospy.get_param(
                 '~enable_intersection_perception', False)))
         self.intersection_rate = max(
             0.2, float(rospy.get_param('~intersection_rate', 5.0)))
@@ -728,8 +748,70 @@ class CameraLaneAvoidance(object):
         self.intersection_stopping = False
         self.intersection_last_queued = 0.0
         self.intersection_thread = None
+        self.latest_intersection_result = None
+        self.latest_intersection_time = 0.0
+        self.intersection_vote_reset_requested = False
+        self.tracker_reset_requested = False
+        self.latest_intersection_command = (0.0, 0.0)
+        self.intersection_result_timeout = self.bounded_param(
+            '~intersection_result_timeout', 0.6, 0.2, 2.0)
+        self.intersection_require_scan = bool(rospy.get_param(
+            '~intersection_require_scan', False))
+        intersection_config = {
+            'enabled': self.intersection_control_enabled,
+            'approach_speed': self.bounded_param(
+                '~intersection_approach_speed', -10.0, -20.0, -3.0),
+            'approach_timeout': self.bounded_param(
+                '~intersection_approach_timeout', 2.0, 0.3, 4.0),
+            'blue_clear_frames': max(1, min(10, int(rospy.get_param(
+                '~blue_clear_frames', 2)))),
+            'straight_speed': self.bounded_param(
+                '~straight_speed', -12.0, -20.0, -3.0),
+            'straight_duration': self.bounded_param(
+                '~straight_duration', 1.0, 0.1, 4.0),
+            'right_speed': self.bounded_param(
+                '~right_speed', -12.0, -20.0, -3.0),
+            'right_angle': self.bounded_param(
+                '~right_angle', -18.0, -25.0, -3.0),
+            'right_duration': self.bounded_param(
+                '~right_duration', 1.5, 0.1, 4.0),
+            'left_speed': self.bounded_param(
+                '~left_speed', -12.0, -20.0, -3.0),
+            'left_angle': self.bounded_param(
+                '~left_angle', 16.0, 3.0, 25.0),
+            'left_duration': self.bounded_param(
+                '~left_duration', 1.5, 0.1, 4.0),
+            'uturn_forward_speed': self.bounded_param(
+                '~uturn_forward_speed', -10.0, -20.0, -3.0),
+            'uturn_forward_angle': self.bounded_param(
+                '~uturn_forward_angle', 20.0, 3.0, 25.0),
+            'uturn_forward_duration': self.bounded_param(
+                '~uturn_forward_duration', 1.0, 0.1, 4.0),
+            'uturn_reverse_speed': self.bounded_param(
+                '~uturn_reverse_speed', 10.0, 3.0, 20.0),
+            'uturn_reverse_angle': self.bounded_param(
+                '~uturn_reverse_angle', -20.0, -25.0, -3.0),
+            'uturn_reverse_duration': self.bounded_param(
+                '~uturn_reverse_duration', 0.8, 0.1, 4.0),
+            'uturn_exit_speed': self.bounded_param(
+                '~uturn_exit_speed', -10.0, -20.0, -3.0),
+            'uturn_exit_angle': self.bounded_param(
+                '~uturn_exit_angle', 18.0, 3.0, 25.0),
+            'uturn_exit_duration': self.bounded_param(
+                '~uturn_exit_duration', 1.0, 0.1, 4.0),
+            'reacquire_confirm_frames': max(
+                1, min(20, int(rospy.get_param(
+                    '~intersection_reacquire_confirm_frames', 3)))),
+            'reacquire_timeout': self.bounded_param(
+                '~intersection_reacquire_timeout', 3.0, 0.5, 8.0),
+            'rearm_seconds': self.bounded_param(
+                '~intersection_rearm_seconds', 2.0, 0.0, 10.0),
+        }
+        self.intersection_controller = IntersectionController(
+            intersection_config)
+        self.intersection_controller.state_started = time.time()
 
-        # Current STM32 convention: positive=right and negative=left.
+        # This car uses negative steering for right and positive for left.
         self.avoid_left = bool(rospy.get_param('~avoid_left', True))
         self.avoid_speed = float(rospy.get_param('~avoid_speed', -15.0))
         self.turn_angle = float(rospy.get_param('~turn_angle', 12.0))
@@ -848,14 +930,24 @@ class CameraLaneAvoidance(object):
                 stream.write('ready\n')
         rospy.loginfo(
             'camera_cmd4 ready: camera=%s scan=%s output=%s avoid_left=%s '
-            'passive_intersection=%s perception_only=%s',
+            'intersection_perception=%s intersection_control=%s '
+            'perception_only=%s',
             self.camera_topic, self.scan_topic,
             self.output_topic, self.avoid_left,
-            self.intersection_enabled, self.perception_only)
+            self.intersection_enabled, self.intersection_control_enabled,
+            self.perception_only)
         if self.perception_only:
             rospy.logwarn(
                 'PERCEPTION ONLY: no drive publisher, LiDAR subscriber, lane '
                 'controller, or control timer was created')
+            if self.intersection_control_requested:
+                rospy.logwarn(
+                    'Intersection control request ignored in perception-only '
+                    'mode')
+        elif self.intersection_enabled and not self.intersection_control_enabled:
+            rospy.logwarn(
+                'INTERSECTION PERCEPTION ONLY: blue lines and signs have no '
+                'control effect')
 
     def transition(self, state, reason):
         if self.state == state:
@@ -921,21 +1013,62 @@ class CameraLaneAvoidance(object):
                 self.intersection_pending = None
             started = time.time()
             try:
+                with self.lock:
+                    reset_votes = self.intersection_vote_reset_requested
+                    self.intersection_vote_reset_requested = False
+                if reset_votes:
+                    self.intersection.reset_sign_votes()
                 result, overlay = self.intersection.detect(
                     frame, header.stamp.to_sec())
                 result['processing_ms'] = (
                     time.time()-started)*1000.0
+                with self.lock:
+                    received = time.time()
+                    self.latest_intersection_result = copy.deepcopy(result)
+                    self.latest_intersection_time = received
+                    intersection_state = self.intersection_controller.state
+                    latched_sign = self.intersection_controller.latched_sign
+                    blue_armed = self.intersection_controller.armed
+                    state_elapsed = max(
+                        0.0, received-
+                        self.intersection_controller.state_started)
+                    planned_speed, planned_steering = (
+                        self.latest_intersection_command)
+                result.update({
+                    'passive_only': not self.intersection_control_enabled,
+                    'intersection_state': intersection_state,
+                    'latched_sign': latched_sign,
+                    'control_enabled': self.intersection_control_enabled,
+                    'blue_armed': blue_armed,
+                    'state_elapsed': state_elapsed,
+                    'planned_speed': planned_speed,
+                    'planned_steering': planned_steering,
+                })
+                control_label = (
+                    'CONTROL %s speed=%.0f steer=%+.1f' %
+                    (intersection_state, planned_speed, planned_steering)
+                    if self.intersection_control_enabled else
+                    'NO CONTROL EFFECT')
+                self.intersection.draw_text(
+                    overlay, control_label, 3,
+                    (0, 255, 255) if not self.intersection_control_enabled
+                    else (255, 255, 255))
+                self.intersection.draw_text(
+                    overlay, 'LATCHED=%s ARMED=%s' %
+                    (str(latched_sign).upper(), blue_armed),
+                    4, (255, 255, 255))
                 self.intersection_status_pub.publish(
                     String(data=json.dumps(result)))
                 self.compressed(
                     self.intersection_image_pub, overlay, header)
                 rospy.loginfo_throttle(
                     1.0,
-                    'cmd4 passive blue=%s len=%d sign=%s time=%.0fms '
-                    '(no control effect)',
+                    'cmd4 intersection blue=%s len=%d sign=%s state=%s '
+                    'time=%.0fms',
                     result['blue']['confirmed'],
                     result['blue']['length'],
                     result['sign_stable_name'],
+                    intersection_state,
                     result['processing_ms'])
             except Exception as exc:
                 rospy.logerr_throttle(
@@ -981,7 +1114,12 @@ class CameraLaneAvoidance(object):
             self.queue_intersection_frame(frame, message.header)
             if self.perception_only:
                 return
+            with self.lock:
+                reset_tracker = self.tracker_reset_requested
+                self.tracker_reset_requested = False
             with self.tracker_lock:
+                if reset_tracker:
+                    self.tracker.reset()
                 result, overlay, bird = self.tracker.detect(
                     frame, stamp)
         except Exception as exc:
@@ -1087,7 +1225,9 @@ class CameraLaneAvoidance(object):
                     self.blocked_frames += 1
                 else:
                     self.blocked_frames = 0
-                if self.blocked_frames >= self.obstacle_confirm_frames:
+                if (not self.intersection_controller.active and
+                        self.blocked_frames >=
+                        self.obstacle_confirm_frames):
                     if self.latest_lane_cmd is not None:
                         self.preavoid_steering = (
                             self.latest_lane_cmd.drive.steering_angle)
@@ -1145,31 +1285,97 @@ class CameraLaneAvoidance(object):
         with self.lock:
             if self.front_clear:
                 self.blocked_frames = 0
-                with self.tracker_lock:
-                    self.tracker.reset()
+                self.intersection_controller.reset(time.time())
+                self.intersection_vote_reset_requested = True
+                self.latest_intersection_result = None
+                self.latest_intersection_time = 0.0
+                self.latest_intersection_command = (0.0, 0.0)
+                self.tracker_reset_requested = True
                 self.transition(FOLLOW, 'manual reset')
             else:
                 rospy.logwarn(
                     'Reset refused: forward corridor occupied')
+
+    def update_intersection_control(self, now):
+        latest = self.latest_intersection_result
+        fresh = (
+            latest is not None and
+            now-self.latest_intersection_time <=
+            self.intersection_result_timeout)
+        blue = {} if latest is None else latest.get('blue', {})
+        perception = {
+            'fresh': bool(fresh),
+            'sample_id': (
+                self.latest_intersection_time if fresh else None),
+            'blue_confirmed': bool(blue.get('confirmed', False)),
+            'blue_raw': bool(blue.get('raw', False)),
+            'stable_sign': (
+                'none' if latest is None else
+                latest.get('sign_stable_name', 'none')),
+        }
+        image_fresh = now-self.last_image_time <= self.image_timeout
+        lane_valid = bool(self.lane_valid and image_fresh)
+        lane_steering = (
+            self.latest_lane_cmd.drive.steering_angle
+            if self.latest_lane_cmd is not None else 0.0)
+        confirmed_obstacle = (
+            self.blocked_frames >= self.obstacle_confirm_frames)
+        safety_fault = None
+        if (self.intersection_controller.active and
+                self.intersection_require_scan and
+                (self.last_scan_time <= 0.0 or
+                 now-self.last_scan_time > self.scan_timeout)):
+            safety_fault = 'laser scan timeout during intersection'
+
+        previous_state = self.intersection_controller.state
+        output = self.intersection_controller.step(
+            now, perception, self.state, lane_valid, lane_steering,
+            confirmed_obstacle, safety_fault=safety_fault,
+            lane_sample_id=self.last_image_time)
+        if output['reset_sign_votes']:
+            self.intersection_vote_reset_requested = True
+            self.latest_intersection_result = None
+            self.latest_intersection_time = 0.0
+        if output['reset_tracker']:
+            self.tracker_reset_requested = True
+            self.lane_valid = False
+            self.latest_lane_cmd = None
+        if output['fault'] is not None and self.state != STOPPED:
+            self.transition(STOPPED, output['fault'])
+        if output['state'] != previous_state:
+            rospy.logwarn(
+                'Intersection state %s -> %s sign=%s fault=%s',
+                previous_state, output['state'],
+                output['latched_sign'], output['fault'])
+        self.latest_intersection_command = (
+            output['command']
+            if output['command'] is not None else (0.0, 0.0))
+        return output
 
     def control_timer(self, unused):
         with self.lock:
             now = time.time()
             elapsed = now-self.state_started
 
-            if (self.state == AVOID_OUT and
+            intersection_output = self.update_intersection_control(now)
+            intersection_active = intersection_output['active']
+
+            if (not intersection_active and
+                    self.state == AVOID_OUT and
                     elapsed >= self.out_duration):
                 self.transition(
                     AVOID_ALIGN,
                     'outward steering duration complete')
                 elapsed = 0.0
-            elif (self.state == AVOID_ALIGN and
+            elif (not intersection_active and
+                  self.state == AVOID_ALIGN and
                   elapsed >= self.align_duration):
                 self.transition(
                     PASS_OBSTACLE,
                     'vehicle aligned beside obstacle')
                 elapsed = 0.0
-            elif (self.state == PASS_OBSTACLE and
+            elif (not intersection_active and
+                  self.state == PASS_OBSTACLE and
                   elapsed >= self.pass_max_duration):
                 if self.front_clear:
                     self.transition(
@@ -1180,25 +1386,29 @@ class CameraLaneAvoidance(object):
                         STOPPED,
                         'pass timeout while obstacle remains ahead')
                 elapsed = 0.0
-            elif (self.state == RETURN_IN and
+            elif (not intersection_active and
+                  self.state == RETURN_IN and
                   elapsed >= self.return_duration):
                 self.transition(
                     RETURN_ALIGN,
                     'return steering duration complete')
                 elapsed = 0.0
-            elif (self.state == RETURN_ALIGN and
+            elif (not intersection_active and
+                  self.state == RETURN_ALIGN and
                   elapsed >= self.return_align_duration):
                 self.transition(
                     RECOVER,
                     'returned to estimated original corridor')
                 elapsed = 0.0
-            elif (self.state == RECOVER and
+            elif (not intersection_active and
+                  self.state == RECOVER and
                   elapsed >= self.recover_timeout):
                 self.transition(
                     STOPPED,
                     'original lane was not confirmed')
                 elapsed = 0.0
-            elif (self.state == RECOVER_BLEND and
+            elif (not intersection_active and
+                  self.state == RECOVER_BLEND and
                   elapsed >= self.blend_duration):
                 self.transition(
                     FOLLOW,
@@ -1208,12 +1418,18 @@ class CameraLaneAvoidance(object):
             avoiding = self.state in (
                 AVOID_OUT, AVOID_ALIGN, PASS_OBSTACLE,
                 RETURN_IN, RETURN_ALIGN)
-            if (avoiding and
+            if (not intersection_active and avoiding and
                     now-self.last_scan_time > self.scan_timeout):
                 self.transition(
                     STOPPED, 'laser scan timeout')
 
-            if self.state == FOLLOW:
+            if intersection_active:
+                speed, steering = (
+                    intersection_output['command']
+                    if intersection_output['command'] is not None
+                    else (0.0, 0.0))
+                command = self.make_command(speed, steering)
+            elif self.state == FOLLOW:
                 image_fresh = (
                     now-self.last_image_time <=
                     self.image_timeout)
@@ -1254,7 +1470,9 @@ class CameraLaneAvoidance(object):
             rospy.loginfo_throttle(
                 0.5,
                 'cmd4 state=%s obstacle=%d side=%d lane=%s speed=%.0f steer=%+.1f',
-                self.state, self.front_points,
+                '%s/%s' % (
+                    self.state, self.intersection_controller.state),
+                self.front_points,
                 self.side_points, self.lane_valid,
                 command.drive.speed,
                 command.drive.steering_angle)
