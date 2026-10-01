@@ -5,8 +5,10 @@ from __future__ import print_function
 
 import argparse
 import copy
+from collections import Counter, deque
 import json
 import math
+import os
 import threading
 import time
 
@@ -477,6 +479,212 @@ RECOVER_BLEND = 'RECOVER_BLEND'
 STOPPED = 'STOPPED'
 
 
+class PassiveIntersectionPerception(object):
+    """Observe blue stop lines and traffic signs without controlling the car."""
+
+    SIGN_NAMES = ('straight', 'right', 'left', 'uturn', 'stop')
+    TEMPLATE_FILES = ('go.png', 'tr.png', 'tl.png', 'tb.png', 'st.png')
+
+    def __init__(self, tracker):
+        self.undistort_map1 = tracker.undistort_map1
+        self.undistort_map2 = tracker.undistort_map2
+        self.blue_lower = np.array([100, 50, 50], dtype=np.uint8)
+        self.blue_upper = np.array([124, 255, 255], dtype=np.uint8)
+        self.blue_length_threshold = int(rospy.get_param(
+            '~blue_length_threshold', 50))
+        self.blue_confirm_frames = int(rospy.get_param(
+            '~blue_confirm_frames', 3))
+        self.blue_streak = 0
+
+        self.sign_threshold = float(rospy.get_param(
+            '~sign_match_threshold', 0.95))
+        vote_window = max(1, int(rospy.get_param('~sign_vote_window', 8)))
+        self.sign_confirm_votes = max(
+            1, int(rospy.get_param('~sign_confirm_votes', 4)))
+        self.sign_votes = deque(maxlen=vote_window)
+        self.stable_sign = None
+        self.templates = []
+        template_dir = os.path.dirname(os.path.abspath(__file__))
+        for filename in self.TEMPLATE_FILES:
+            path = os.path.join(template_dir, filename)
+            template = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+            if template is None:
+                rospy.logwarn('Traffic-sign template missing: %s', path)
+            self.templates.append(template)
+
+    @staticmethod
+    def draw_text(image, text, line, color):
+        cv2.putText(
+            image, text, (18, 32+line*30), cv2.FONT_HERSHEY_SIMPLEX,
+            0.65, color, 2)
+
+    def detect_blue(self, corrected, overlay):
+        small = cv2.resize(corrected, (96, 128))
+        height, width = small.shape[:2]
+        crop_y0 = int(2*height/5)
+        crop_width = width-20
+        roi = small[crop_y0:height, 0:crop_width]
+        hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
+        mask = cv2.inRange(hsv, self.blue_lower, self.blue_upper)
+        rows, columns = np.nonzero(mask)
+        pixel_count = int(columns.size)
+        length = int(np.unique(columns).size) if pixel_count else 0
+        raw_trigger = length > self.blue_length_threshold
+        if raw_trigger:
+            self.blue_streak += 1
+        else:
+            self.blue_streak = 0
+        confirmed = self.blue_streak >= self.blue_confirm_frames
+
+        scale_x = overlay.shape[1]/float(width)
+        scale_y = overlay.shape[0]/float(height)
+        top = int(round(crop_y0*scale_y))
+        right = int(round(crop_width*scale_x))
+        enlarged = cv2.resize(
+            mask, (right, overlay.shape[0]-top),
+            interpolation=cv2.INTER_NEAREST)
+        target = overlay[top:overlay.shape[0], 0:right]
+        selected = enlarged > 0
+        if np.any(selected):
+            magenta = np.zeros_like(target)
+            magenta[:, :] = (255, 0, 255)
+            target[selected] = (
+                0.35*target[selected]+0.65*magenta[selected]).astype(np.uint8)
+
+        angle = 0.0
+        mid_x = 0.0
+        mid_y = 0.0
+        if pixel_count > 2:
+            mid_x = float(np.mean(columns))
+            mid_y = float(np.mean(rows))
+            slope, intercept = np.polyfit(columns, rows, 1)
+            angle = float(np.arctan(slope)*180.0/np.pi)
+            first = float(columns.min())
+            last = float(columns.max())
+            points = []
+            for column in (first, last):
+                row = float(slope*column+intercept)
+                points.append((
+                    int(round(column*scale_x)),
+                    int(round((crop_y0+row)*scale_y))))
+            cv2.line(overlay, points[0], points[1], (0, 255, 0), 4)
+            cv2.circle(
+                overlay,
+                (int(round(mid_x*scale_x)),
+                 int(round((crop_y0+mid_y)*scale_y))),
+                7, (0, 255, 255), -1)
+        cv2.rectangle(
+            overlay, (0, top), (max(0, right-1), overlay.shape[0]-1),
+            (255, 255, 0), 2)
+        return {
+            'raw': bool(raw_trigger),
+            'confirmed': bool(confirmed),
+            'streak': int(self.blue_streak),
+            'length': length,
+            'pixel_count': pixel_count,
+            'mid_x': mid_x,
+            'mid_y': mid_y,
+            'angle_deg': angle}
+
+    def detect_sign(self, corrected):
+        gray = cv2.cvtColor(corrected, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (3, 3), 2, 2)
+        edges = cv2.Canny(blurred, 150, 300)
+        contour_result = cv2.findContours(
+            edges.copy(), cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+        contours = contour_result[-2]
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)[:30]
+        candidates = []
+        for contour in contours:
+            perimeter = cv2.arcLength(contour, True)
+            area = cv2.contourArea(contour)
+            x, y, width, height = cv2.boundingRect(contour)
+            if area <= 500 or height <= 0 or abs(height-width) >= 0.2*height:
+                continue
+            rectangle_error = abs((perimeter/4.0)**2-area)
+            circle_error = abs(perimeter**2/(4.0*np.pi)-area)
+            if rectangle_error < area*0.2 or circle_error < area*0.15:
+                candidates.append((area, (x, y, width, height)))
+        if not candidates:
+            return None
+
+        unused_area, box = max(candidates, key=lambda item: item[0])
+        x, y, width, height = box
+        crop = gray[y:y+height, x:x+width]
+        if crop.size == 0:
+            return None
+        crop = cv2.resize(crop, (200, 200))
+        scores = []
+        for template in self.templates:
+            if template is None:
+                scores.append(-1.0)
+                continue
+            response = cv2.matchTemplate(
+                crop, template, cv2.TM_CCORR_NORMED)
+            scores.append(float(cv2.minMaxLoc(response)[1]))
+        sign_class = int(np.argmax(scores))
+        confidence = float(scores[sign_class])
+        if confidence < self.sign_threshold:
+            return {'class_id': None, 'name': 'unknown',
+                    'confidence': confidence, 'bbox': list(box)}
+        return {'class_id': sign_class,
+                'name': self.SIGN_NAMES[sign_class],
+                'confidence': confidence, 'bbox': list(box)}
+
+    def update_sign_vote(self, detection):
+        class_id = None if detection is None else detection.get('class_id')
+        self.sign_votes.append(-1 if class_id is None else int(class_id))
+        counts = Counter(value for value in self.sign_votes if value >= 0)
+        if counts:
+            winner, votes = counts.most_common(1)[0]
+            if votes >= self.sign_confirm_votes:
+                self.stable_sign = int(winner)
+            elif len(self.sign_votes) == self.sign_votes.maxlen:
+                self.stable_sign = None
+        elif len(self.sign_votes) == self.sign_votes.maxlen:
+            self.stable_sign = None
+        return self.stable_sign
+
+    def detect(self, frame, stamp):
+        corrected = cv2.remap(
+            frame, self.undistort_map1, self.undistort_map2,
+            cv2.INTER_LINEAR)
+        overlay = corrected.copy()
+        blue = self.detect_blue(corrected, overlay)
+        sign = self.detect_sign(corrected)
+        stable_sign = self.update_sign_vote(sign)
+
+        raw_name = 'none' if sign is None else sign['name']
+        confidence = 0.0 if sign is None else sign['confidence']
+        if sign is not None:
+            x, y, width, height = sign['bbox']
+            color = (0, 255, 0) if sign['class_id'] is not None else (0, 255, 255)
+            cv2.rectangle(
+                overlay, (x, y), (x+width, y+height), color, 3)
+        stable_name = (
+            'none' if stable_sign is None else self.SIGN_NAMES[stable_sign])
+        self.draw_text(overlay, 'PASSIVE INTERSECTION PERCEPTION', 0,
+                       (255, 255, 255))
+        self.draw_text(
+            overlay,
+            'BLUE raw=%s confirmed=%s len=%d streak=%d' %
+            (blue['raw'], blue['confirmed'], blue['length'], blue['streak']),
+            1, (0, 0, 255) if blue['confirmed'] else (255, 255, 255))
+        self.draw_text(
+            overlay, 'SIGN raw=%s %.3f stable=%s' %
+            (raw_name, confidence, stable_name),
+            2, (0, 255, 0) if stable_sign is not None else (255, 255, 255))
+        self.draw_text(overlay, 'NO CONTROL EFFECT', 3, (0, 255, 255))
+
+        return ({
+            'passive_only': True,
+            'capture_stamp': float(stamp),
+            'blue': blue,
+            'sign_raw': sign,
+            'sign_stable_id': stable_sign,
+            'sign_stable_name': stable_name}, overlay)
+
+
 class CameraLaneAvoidance(object):
     def __init__(self, ready_file=None):
         self.lock = threading.RLock()
@@ -489,6 +697,18 @@ class CameraLaneAvoidance(object):
         self.scan_topic = rospy.get_param('~scan_topic', '/scan')
         self.output_topic = rospy.get_param(
             '~output_topic', '/ackermann_cmd')
+        self.intersection_enabled = bool(rospy.get_param(
+            '~enable_intersection_perception', False))
+        self.intersection_rate = max(
+            0.2, float(rospy.get_param('~intersection_rate', 5.0)))
+        self.intersection = (
+            PassiveIntersectionPerception(self.tracker)
+            if self.intersection_enabled else None)
+        self.intersection_condition = threading.Condition()
+        self.intersection_pending = None
+        self.intersection_stopping = False
+        self.intersection_last_queued = 0.0
+        self.intersection_thread = None
 
         # Current STM32 convention: positive=right and negative=left.
         self.avoid_left = bool(rospy.get_param('~avoid_left', True))
@@ -565,13 +785,18 @@ class CameraLaneAvoidance(object):
         self.cmd_pub = rospy.Publisher(
             self.output_topic, AckermannDriveStamped, queue_size=1)
         self.trajectory_pub = rospy.Publisher(
-            '/camera_cmd5/trajectory/compressed',
+            '/camera_cmd4/trajectory/compressed',
             CompressedImage, queue_size=1)
         self.bird_pub = rospy.Publisher(
-            '/camera_cmd5/bird/compressed',
+            '/camera_cmd4/bird/compressed',
             CompressedImage, queue_size=1)
         self.status_pub = rospy.Publisher(
-            '/camera_cmd5/status', String, queue_size=1)
+            '/camera_cmd4/status', String, queue_size=1)
+        self.intersection_image_pub = rospy.Publisher(
+            '/camera_cmd4/intersection/compressed',
+            CompressedImage, queue_size=1)
+        self.intersection_status_pub = rospy.Publisher(
+            '/camera_cmd4/intersection/status', String, queue_size=1)
 
         self.image_sub = rospy.Subscriber(
             self.camera_topic, Image,
@@ -580,19 +805,26 @@ class CameraLaneAvoidance(object):
             self.scan_topic, LaserScan,
             self.scan_callback, queue_size=1)
         self.reset_sub = rospy.Subscriber(
-            '/camera_cmd5/reset', Bool,
+            '/camera_cmd4/reset', Bool,
             self.reset_callback, queue_size=1)
 
         self.timer = rospy.Timer(
             rospy.Duration(0.05), self.control_timer)
         rospy.on_shutdown(self.shutdown)
+        if self.intersection_enabled:
+            self.intersection_thread = threading.Thread(
+                target=self.intersection_worker)
+            self.intersection_thread.daemon = True
+            self.intersection_thread.start()
         if ready_file:
             with open(ready_file, 'w') as stream:
                 stream.write('ready\n')
         rospy.loginfo(
-            'camera_cmd5 ready: camera=%s scan=%s output=%s avoid_left=%s',
+            'camera_cmd4 ready: camera=%s scan=%s output=%s avoid_left=%s '
+            'passive_intersection=%s',
             self.camera_topic, self.scan_topic,
-            self.output_topic, self.avoid_left)
+            self.output_topic, self.avoid_left,
+            self.intersection_enabled)
 
     def transition(self, state, reason):
         if self.state == state:
@@ -633,6 +865,51 @@ class CameraLaneAvoidance(object):
             message.data = encoded.tobytes()
             publisher.publish(message)
 
+    def queue_intersection_frame(self, frame, header):
+        if not self.intersection_enabled:
+            return
+        now = time.time()
+        if now-self.intersection_last_queued < 1.0/self.intersection_rate:
+            return
+        self.intersection_last_queued = now
+        with self.intersection_condition:
+            self.intersection_pending = (
+                frame.copy(), copy.deepcopy(header))
+            self.intersection_condition.notify()
+
+    def intersection_worker(self):
+        while not rospy.is_shutdown():
+            with self.intersection_condition:
+                while (self.intersection_pending is None and
+                       not self.intersection_stopping and
+                       not rospy.is_shutdown()):
+                    self.intersection_condition.wait(0.25)
+                if self.intersection_stopping or rospy.is_shutdown():
+                    return
+                frame, header = self.intersection_pending
+                self.intersection_pending = None
+            started = time.time()
+            try:
+                result, overlay = self.intersection.detect(
+                    frame, header.stamp.to_sec())
+                result['processing_ms'] = (
+                    time.time()-started)*1000.0
+                self.intersection_status_pub.publish(
+                    String(data=json.dumps(result)))
+                self.compressed(
+                    self.intersection_image_pub, overlay, header)
+                rospy.loginfo_throttle(
+                    1.0,
+                    'cmd4 passive blue=%s len=%d sign=%s time=%.0fms '
+                    '(no control effect)',
+                    result['blue']['confirmed'],
+                    result['blue']['length'],
+                    result['sign_stable_name'],
+                    result['processing_ms'])
+            except Exception as exc:
+                rospy.logerr_throttle(
+                    1.0, 'Passive intersection perception failed: %s', exc)
+
     def update_recovery(self, result):
         steering = float(result.get('steering', 0.0))
         valid = bool(result.get('valid', False))
@@ -662,7 +939,7 @@ class CameraLaneAvoidance(object):
             with self.lock:
                 self.lane_valid = False
             rospy.logwarn_throttle(
-                1.0, 'camera_cmd5 rejected a stale camera frame')
+                1.0, 'camera_cmd4 rejected a stale camera frame')
             return
         try:
             frame = self.bridge.imgmsg_to_cv2(
@@ -670,6 +947,7 @@ class CameraLaneAvoidance(object):
             if frame.shape != (480, 640, 3):
                 raise ValueError(
                     'Calibration requires a 640x480 image')
+            self.queue_intersection_frame(frame, message.header)
             with self.tracker_lock:
                 result, overlay, bird = self.tracker.detect(
                     frame, stamp)
@@ -714,7 +992,7 @@ class CameraLaneAvoidance(object):
             self.bird_pub, bird, message.header)
         rospy.loginfo_throttle(
             0.5,
-            'cmd5 lane=%s mode=%s state=%s speed=%.0f steer=%+.1f time=%.0fms',
+            'cmd4 lane=%s mode=%s state=%s speed=%.0f steer=%+.1f time=%.0fms',
             result['reason'], result['mode'], state_snapshot,
             result['speed'], result['steering'],
             result['processing_ms'])
@@ -942,22 +1220,29 @@ class CameraLaneAvoidance(object):
             self.cmd_pub.publish(command)
             rospy.loginfo_throttle(
                 0.5,
-                'cmd5 state=%s obstacle=%d side=%d lane=%s speed=%.0f steer=%+.1f',
+                'cmd4 state=%s obstacle=%d side=%d lane=%s speed=%.0f steer=%+.1f',
                 self.state, self.front_points,
                 self.side_points, self.lane_valid,
                 command.drive.speed,
                 command.drive.steering_angle)
 
     def shutdown(self):
+        with self.intersection_condition:
+            self.intersection_stopping = True
+            self.intersection_pending = None
+            self.intersection_condition.notifyAll()
         with self.lock:
             self.cmd_pub.publish(self.make_command())
+        if (self.intersection_thread is not None and
+                self.intersection_thread.is_alive()):
+            self.intersection_thread.join(1.0)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ready-file')
     args = parser.parse_args(rospy.myargv()[1:])
-    rospy.init_node('camera_cmd5')
+    rospy.init_node('camera_cmd4')
     CameraLaneAvoidance(args.ready_file)
     rospy.spin()
 
