@@ -1,1101 +1,966 @@
 #!/usr/bin/env python
-# -*- coding: UTF-8 -*-
-import numpy as np
-import cv2
-import matplotlib.pyplot as plt
-from collections import deque
-import rospy
-from std_msgs.msg import String
-from sensor_msgs.msg import Image, CompressedImage
-from cv_bridge import CvBridge, CvBridgeError
-from ackermann_msgs.msg import AckermannDriveStamped
-from laser_test.msg import laser_control
-import tensorflow as tf
+# -*- coding: utf-8 -*-
+"""Single-node camera lane following with LiDAR obstacle avoidance."""
+from __future__ import print_function
+
+import argparse
+import copy
+import json
 import math
-import os
 import threading
-#from skimage import morphology
 import time
-global x0 
-x0 = 1
-global peak_thresh
-peak_thresh = 10
-global n 
-n = 0
-global laser_cmd
-laser_cmd = 0
-# Front camera calibration for /usb_cam_2/image at 640x480.
-# Source: smartcar-data/calibration/session-20260925-203626-24mm-reprocessed-a4dfcb/
-#         front/results/20260925-204413-7be6b392/camera.yaml
-intrinsicMat = np.array([[444.92179141947196, 0.0, 337.9399577215935],
-                         [0.0, 443.59684870127415, 285.85005027454673],
-                         [0.0, 0.0, 1.0]])
-distortionCoe = np.array([-0.41251110946304526,
-                           0.3572865990594976,
-                           0.0010943780467337042,
-                           0.0007363828658040413,
-                          -0.2652600879338458])
 
-showMe = 0
-show_windows = False
-
-# Keep camera geometry and preprocessing parameters aligned with camera_cmd3.
-FRAME_SIZE = (640, 480)
-SRC_PTS = np.float32([[286,285],[117,378],[559,380],[388,285]])
-DST_PTS = np.float32([[170,0],[170,480],[470,480],[470,0]])
-TRANSFORM_MATRIX = {
-    'M': cv2.getPerspectiveTransform(SRC_PTS, DST_PTS),
-    'Minv': cv2.getPerspectiveTransform(DST_PTS, SRC_PTS)
-}
-UNDISTORT_MAP1, UNDISTORT_MAP2 = cv2.initUndistortRectifyMap(
-    intrinsicMat, distortionCoe, None, intrinsicMat, FRAME_SIZE, cv2.CV_16SC2)
-DILATE_KERNEL = np.ones((15,15), np.uint8)
-ERODE_KERNEL = np.ones((7,7), np.uint8)
-
-# The bird-view destination maps the 60 cm lane to x=170..470.
-# Follow only the solid right boundary and infer the lane centre 30 cm left of it.
-LANE_WIDTH_PX = 300.0
-HALF_LANE_WIDTH_PX = LANE_WIDTH_PX / 2.0
-RIGHT_EXPECTED_X = 470
-RIGHT_MIN_PIXELS = 200
-RIGHT_MIN_VERTICAL_BINS = 6
-# Preserve the same physical jump tolerance after changing 500 px to 300 px.
-RIGHT_MAX_BOTTOM_JUMP_PX = 42.0
-RIGHT_MAX_FAR_JUMP_PX = 54.0
-RIGHT_HOLD_FRAMES = 1
-RIGHT_SMOOTHING_ALPHA = 0.75
-RIGHT_SEARCH_HALF_WIDTH = 70
-RIGHT_BAND_MIN_WIDTH = 1
-RIGHT_BAND_MAX_WIDTH = 80
-RIGHT_OUTWARD_SWITCH_PX = 18.0
-RIGHT_OUTWARD_PARALLEL_SPREAD_PX = 20.0
-RIGHT_PENDING_MATCH_PX = 18.0
-RIGHT_REACQUIRE_FRAMES = 3
-RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES = 3
-RIGHT_GLOBAL_REACQUIRE_FRAMES = 3
-# Do not move until the same innermost right line has been seen repeatedly.
-RIGHT_INITIAL_CONFIRM_FRAMES = 5
-RIGHT_INITIAL_MAX_BOTTOM_X = 480.0
-# Compare every accepted candidate with the independently stored inner-line
-# identity.  This catches gradual frame-to-frame drift to the outer map edge.
-RIGHT_TRUSTED_OUTWARD_LIMIT_PX = 10.0
-right_edge_close_kernel_size = 3
-right_lane_tracker = {
-    'fit': None,
-    'trusted_fit': None,
-    'lost_frames': 0,
-    'pending_fit': None,
-    'pending_frames': 0,
-    'force_global_search': False,
-    'last_speed': 0.0,
-    'last_steering': 0.0,
-    'has_trusted_command': False
-}
-debug_images = {}
-debug_images_lock = threading.Lock()
-
-
-def show_cv_window(title, image):
-    """Queue the newest debug frame; the ROS main thread displays it."""
-    if show_windows and title == 'result':
-        with debug_images_lock:
-            debug_images[title] = image.copy()
-
-
-def publish_trajectory_view(image):
-    """Publish the processed camera view only while a remote viewer exists."""
-    if pubresult.get_num_connections() <= 0:
-        return
-    encoded_ok, encoded_image = cv2.imencode(
-        '.jpg', image, [int(cv2.IMWRITE_JPEG_QUALITY), 70])
-    if encoded_ok:
-        debug_msg = CompressedImage()
-        debug_msg.header.stamp = rospy.Time.now()
-        debug_msg.format = 'jpeg'
-        debug_msg.data = encoded_image.tostring()
-        pubresult.publish(debug_msg)
-
-
-def run_debug_window_loop():
-    """Run OpenCV HighGUI on the main thread to avoid callback deadlocks."""
-    cv2.namedWindow('result', cv2.WINDOW_NORMAL)
-    rate = rospy.Rate(30)
-    while not rospy.is_shutdown():
-        with debug_images_lock:
-            frames = [('result', debug_images.get('result'))]
-        for title, frame in frames:
-            if frame is not None:
-                cv2.imshow(title, frame)
-        cv2.waitKey(1)
-        rate.sleep()
-    cv2.destroyAllWindows()
-
-
-def display(img,title,color=1):
-    '''
-    func:display image
-    img: rgb or grayscale
-    title:figure title
-    color:show image in color(1) or grayscale(0)
-    '''
-    if showMe:
-        if color:
-            plt.imshow(img)
-        else:
-            plt.imshow(img ,cmap='gray')
-        plt.title(title)
-        plt.axis('off')
-        plt.show()
-def light_detection(origin_img):      
-    light_cmd=0               
-    hsv=cv2.cvtColor(origin_img,cv2.COLOR_BGR2HSV)   #转化为HSV格式图像，更好得处理光线对图像的影响。（由于处理器处理能力限制那个1w的摄像头没法用，读入的图像只有5帧以内，调节不及时）
-    hsv1 = hsv.copy()
-    element = cv2.getStructuringElement(cv2.MORPH_RECT,(5,5))
-    red_lower = np.array([0,95,230])        #这两个是阈值，红灯的上界和下界
-    red_upper = np.array([5,255,255])
-    red_mask = cv2.inRange(hsv,red_lower,red_upper)
-    red_target = cv2.bitwise_and(hsv,hsv,mask = red_mask)
-    red_target = cv2.erode(red_target,element)
-    red_target = cv2.dilate(red_target,element)
-    red_gray = cv2.cvtColor(red_target,cv2.COLOR_BGR2GRAY)
-    r_ret,r_binary = cv2.threshold(red_mask,127,255,cv2.THRESH_BINARY)
-    r_gray2 = cv2.Canny(r_binary, 100, 200) 
-    r = r_gray2[:,:] == 255
-    count_red = len(r_gray2[r])
-    if count_red>700:
-        redLight = 1
-    else:
-        redLight = 0
-    green_lower = np.array([80,95,230])    #这个阈值有问题,在寝室调不出来
-    green_upper = np.array([130,255,255])
-    green_mask = cv2.inRange(hsv1,green_lower,green_upper)
-    green_target = cv2.bitwise_and(hsv1,hsv1,mask = green_mask)
-    green_target = cv2.erode(green_target,element)
-    green_target = cv2.dilate(green_target,element)
-    green_gray = cv2.cvtColor(green_target,cv2.COLOR_BGR2GRAY)
-    g_ret,g_binary = cv2.threshold(green_mask,127,255,cv2.THRESH_BINARY)
-    g_gray2 = cv2.Canny(g_binary, 100, 200)       
-    g = g_gray2[:,:] == 255
-    count_green = len(g_gray2[g])
-    if count_green>700:
-        greenLight = 1
-    else:
-        greenLight = 0
-    if redLight ==1 :
-        light_cmd = 0
-    if greenLight == 1 :
-        light_cmd = 1
-    return light_cmd
-
-def birdView(img,M):
-    '''
-    Transform image to birdeye view
-    img:binary image
-    M:transformation matrix
-    return a wraped image
-    '''
-    img_sz = (img.shape[1],img.shape[0])
-    img_warped = cv2.warpPerspective(img,M,img_sz,flags = cv2.INTER_LINEAR)
-    return img_warped
-def perspective_transform(src_pts,dst_pts):
-    '''
-    perspective transform
-    args:source and destiantion points
-    return M and Minv
-    '''
-    M = cv2.getPerspectiveTransform(src_pts,dst_pts)
-    Minv = cv2.getPerspectiveTransform(dst_pts,src_pts)
-    return {'M':M,'Minv':Minv}
-# original image to bird view (transformation)
-
-
-def find_centroid(image,peak_thresh,window,showMe):
-    '''
-    find centroid in a window using histogram of hotpixels
-    img:binary image
-    window with specs {'x0','y0','width','height'}
-    (x0,y0) coordinates of bottom-left corner of window
-    return x-position of centroid ,peak intensity and hotpixels_cnt in window
-    '''
-    #crop image to window dimension
-    mask_window = image[int(window['y0']-window['height']):int(window['y0']),
-                        int(window['x0']):int(window['x0']+window['width'])]
-    histogram = np.sum(mask_window,axis=0)
-    centroid = np.argmax(histogram)
-    # This value is used as a density ratio by the sliding-window tracker.
-    # Count pixels instead of summing their 0/255 intensities.
-    hotpixels_cnt = np.count_nonzero(mask_window)
-    peak_intensity = histogram[centroid]
-    if peak_intensity<=peak_thresh:
-        centroid = int(round(window['x0']+window['width']/2))
-        peak_intensity = 0
-    else:
-        centroid = int(round(centroid+window['x0']))
-    '''
-    if showMe:
-        plt.plot(histogram)
-        plt.title('Histogram')
-        plt.xlabel('horzontal position')
-        plt.ylabel('hot pixels count')
-        plt.show()
-    '''
-    return (centroid,peak_intensity,hotpixels_cnt)
-def find_starter_centroids(image,x0,peak_thresh,showMe):
-    '''
-    find starter centroids using histogram
-    peak_thresh:if peak intensity is below a threshold use histogram on the full height of the image
-    returns x-position of centroid and peak intensity
-    '''
-    window = {'x0':x0,'y0':image.shape[0],'width':image.shape[1]/2,'height':image.shape[0]/2}
-    # get centroid
-    centroid , peak_intensity,_ = find_centroid(image,peak_thresh,window,showMe)
-    if peak_intensity<peak_thresh:
-        window['height'] = image.shape[0]
-        centroid,peak_intensity,_ = find_centroid(image,peak_thresh,window,showMe)
-    return {'centroid':centroid,'intensity':peak_intensity}
-# if number of histogram pixels in window is below 10,condisder them as noise and does not attempt to get centroid
-
-
-def find_histogram_bands(histogram, min_support):
-    """Return continuous edge bands as (centre, start, end, strength)."""
-    active = np.asarray(histogram >= min_support, dtype=np.uint8)
-    padded = np.concatenate((np.zeros(1, dtype=np.uint8), active,
-                             np.zeros(1, dtype=np.uint8)))
-    changes = np.diff(padded.astype(np.int16))
-    starts = np.flatnonzero(changes == 1)
-    ends = np.flatnonzero(changes == -1)
-    bands = []
-    for start, end in zip(starts, ends):
-        width = int(end - start)
-        if width < RIGHT_BAND_MIN_WIDTH or width > RIGHT_BAND_MAX_WIDTH:
-            continue
-        weights = np.asarray(histogram[start:end], dtype=np.float64)
-        strength = float(np.sum(weights))
-        if strength <= 0:
-            continue
-        positions = np.arange(start, end, dtype=np.float64)
-        centre = int(round(np.sum(positions * weights) / strength))
-        bands.append((centre, int(start), int(end), strength))
-    return bands
-
-
-def find_right_starter(image, peak_thresh):
-    """Choose the innermost credible Canny edge in the lower right view."""
-    height, width = image.shape[:2]
-    # Use only the nearest part of the view so a curved stripe does not smear
-    # into one very wide histogram band during initialisation.
-    y_min = max(int(height * 0.75), height - 80)
-    histogram = np.count_nonzero(image[y_min:height, :], axis=0)
-    min_support = max(2, int(round((height - y_min) * 0.04)))
-    bands = find_histogram_bands(histogram, min_support)
-    x_min = max(width / 2 + 10, int(round(RIGHT_EXPECTED_X - 120)))
-    x_max = min(width - 1, int(round(RIGHT_EXPECTED_X + 160)))
-    candidates = [band for band in bands
-                  if x_min <= band[0] <= x_max]
-    if not candidates:
-        return {'centroid': RIGHT_EXPECTED_X, 'intensity': 0}
-
-    # The lane boundary is the first Canny edge encountered from the road
-    # interior. The opposite side of the paint and map border lie farther right.
-    selected = min(candidates, key=lambda band: band[0])
-    return {'centroid': selected[0], 'intensity': selected[3]}
-
-
-def run_right_band_window(image, centroid_starter, sliding_window_specs,
-                          showMe=False):
-    """Track one Canny edge bottom-up with a curvature predictor."""
-    height = int(round(
-        float(image.shape[0]) / sliding_window_specs['n_steps']))
-    hotpixels_log = {'x': [], 'y': []}
-    selected_centres = []
-    expected_x = float(centroid_starter)
-    out_img = None
-    if showMe:
-        out_img = np.dstack((image, image, image)).astype('uint8')
-
-    for step in range(sliding_window_specs['n_steps']):
-        y_end = image.shape[0] - step * height
-        y_start = max(0, y_end - height)
-        if y_end <= y_start:
-            continue
-
-        if len(selected_centres) >= 2:
-            step_delta = selected_centres[-1] - selected_centres[-2]
-            step_delta = max(-RIGHT_SEARCH_HALF_WIDTH,
-                             min(RIGHT_SEARCH_HALF_WIDTH, step_delta))
-            expected_x = selected_centres[-1] + step_delta
-        elif selected_centres:
-            expected_x = selected_centres[-1]
-
-        x_start = max(0, int(round(expected_x - RIGHT_SEARCH_HALF_WIDTH)))
-        x_end = min(image.shape[1],
-                    int(round(expected_x + RIGHT_SEARCH_HALF_WIDTH)) + 1)
-        if x_end <= x_start:
-            continue
-
-        crop = image[y_start:y_end, x_start:x_end]
-        histogram = np.count_nonzero(crop, axis=0)
-        min_support = max(2, int(round((y_end - y_start) * 0.08)))
-        local_bands = find_histogram_bands(histogram, min_support)
-        bands = [(band[0] + x_start, band[1] + x_start,
-                  band[2] + x_start, band[3]) for band in local_bands]
-        if not bands:
-            if showMe:
-                cv2.rectangle(out_img, (x_start, y_start), (x_end, y_end),
-                              (0, 0, 255), 1)
-            continue
-
-        # A stronger outer border must not pull the tracker away from the
-        # predicted stripe. Distance to the tracked identity wins over strength.
-        selected = min(bands, key=lambda band: abs(band[0] - expected_x))
-        centre, band_start, band_end, _ = selected
-        selected_centres.append(float(centre))
-        hot_y, hot_x = np.nonzero(
-            image[y_start:y_end, band_start:band_end])
-        hotpixels_log['x'].extend((hot_y + y_start).tolist())
-        hotpixels_log['y'].extend((hot_x + band_start).tolist())
-
-        if showMe:
-            cv2.rectangle(out_img, (x_start, y_start), (x_end, y_end),
-                          (0, 165, 255), 1)
-            cv2.rectangle(out_img, (band_start, y_start),
-                          (band_end, y_end), (0, 255, 0), 2)
-
-    return hotpixels_log, out_img
-
-
-def starter_candidate_geometry(hotpixels, image_height):
-    """Return a valid starter fit and observed/fitted positions, or None."""
-    rows = np.asarray(hotpixels['x'])
-    columns = np.asarray(hotpixels['y'])
-    if rows.size < RIGHT_MIN_PIXELS:
-        return None
-    vertical_bins = np.unique(np.minimum(
-        (rows * 10 / image_height).astype(np.int32), 9))
-    if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
-        return None
-
-    candidate = polynomial_fit(hotpixels)
-    bottom_x = evaluate_fit(candidate, image_height - 1)
-    far_x = evaluate_fit(candidate, int(image_height * 0.50))
-    if (not np.isfinite(bottom_x) or not np.isfinite(far_x) or
-            bottom_x < 350 or bottom_x >= 640 or
-            far_x < 220 or far_x >= 640):
-        return None
-    near_columns = columns[rows >= int(image_height * 0.85)]
-    if near_columns.size == 0:
-        return None
-    observed_near_x = float(np.median(near_columns))
-    return candidate, float(bottom_x), float(far_x), observed_near_x
-
-
-def find_innermost_right_track(image, sliding_window_specs):
-    """Search the right half from multiple starts and keep the inner track."""
-    starter_positions = range(350, 631, 35)
-    valid_tracks = []
-    fallback = {'x': [], 'y': []}
-
-    for starter in starter_positions:
-        hotpixels, unused = run_right_band_window(
-            image, starter, sliding_window_specs, showMe=False)
-        if len(hotpixels['x']) > len(fallback['x']):
-            fallback = hotpixels
-        geometry = starter_candidate_geometry(hotpixels, image.shape[0])
-        if geometry is None:
-            continue
-        candidate, bottom_x, far_x, observed_near_x = geometry
-        valid_tracks.append((observed_near_x, bottom_x, far_x,
-                             candidate, hotpixels, starter))
-
-    if not valid_tracks:
-        rospy.logwarn_throttle(
-            1.0, 'Global right search: no valid track (%d fallback pixels)',
-            len(fallback['x']))
-        return fallback
-
-    # For a right boundary, the smaller bird-view x position is closer to the
-    # road interior.  All candidates have already passed right-side geometry
-    # and vertical-coverage checks, so the left dashed lane is excluded.
-    selected = min(valid_tracks, key=lambda item: item[0])
-    rospy.loginfo_throttle(
-        1.0,
-        'Global right search: %d tracks, inner observed=%.1f bottom=%.1f '
-        'far=%.1f start=%d',
-        len(valid_tracks), selected[0], selected[1], selected[2], selected[5])
-    return selected[4]
-
-
-
-def run_sliding_window(image, centroid_starter, sliding_window_specs, showMe=showMe):
-    '''
-    Run sliding window from bottom to top of the image and return indexes of the hotpixels associated with lane
-    image:binary image
-    centroid_starter:centroid starting location sliding window
-    sliding_window_specs:['width','n_steps']
-        width of sliding window
-        number of steps of sliding window alog vertical axis
-    return {'x':[],'y':[]}
-        coordiantes of all hotpixels detected by sliding window
-        coordinates of alll centroids recorded but not used yet!
-    '''
-    # Initialize sliding window
-    '''
-    result = image
-    if Left_or_Right == 0:
-        image = image[:,0:image.shape[1]/2]
-    if Left_or_Right == 1:
-        image = image[:,image.shape[1]/2:image.shape[1]]
-    '''
-    window = {'x0': centroid_starter - int(sliding_window_specs['width'] / 2),
-              'y0': image.shape[0], 'width': sliding_window_specs['width'],
-              'height': round(image.shape[0] / sliding_window_specs['n_steps'])}
-    hotpixels_log = {'x': [], 'y': []}
-    centroids_log = []
-    out_img = image
-    if showMe:
-        out_img = (np.dstack((image, image, image)) * 255).astype('uint8')
-    for step in range(sliding_window_specs['n_steps']):
-        if window['x0'] < 0: window['x0'] = 0
-        if (window['x0'] + sliding_window_specs['width']) > image.shape[1]:
-            window['x0'] = image.shape[1] - sliding_window_specs['width']
-        centroid, peak_intensity, hotpixels_cnt = find_centroid(image, peak_thresh, window, showMe=0)
-        if step == 0:
-            starter_centroid = centroid
-        if hotpixels_cnt / (window['width'] * window['height']) > 0.6:
-            window['width'] = window['width'] * 2
-            window['x0'] = round(window['x0'] - window['width'] / 2)
-            if (window['x0'] < 0): window['x0'] = 0
-            if (window['x0'] + window['width']) > image.shape[1]:
-                window['x0'] = image.shape[1] - window['width']
-            centroid, peak_intensity, hotpixels_cnt = find_centroid(image, peak_thresh, window, showMe=0)
-
-            # if showMe:
-            # print('peak intensity{}'.format(peak_intensity))
-            # print('This is centroid:{}'.format(centroid))
-        y_start = int(max(0, window['y0'] - window['height']))
-        y_end = int(min(image.shape[0], window['y0']))
-        x_start = int(max(0, window['x0']))
-        x_end = int(min(image.shape[1], window['x0'] + window['width']))
-        window_pixels = image[y_start:y_end, x_start:x_end]
-        local_rows, local_columns = np.nonzero(window_pixels)
-        hotpixels_log['x'].extend((local_rows + y_start).tolist())
-        hotpixels_log['y'].extend((local_columns + x_start).tolist())
-        # update record of centroid
-        centroids_log.append(centroid)
-        if showMe:
-            out_img = cv2.rectangle(
-                out_img,
-                (int(window['x0']), int(window['y0'] - window['height'])),
-                (int(window['x0'] + window['width']), int(window['y0'])),
-                (255, 0, 0), 2)
-        
-        ''' 
-        if Left_or_Right == 0:
-            result[0:image.shape[0],0:image.shape[1]] = out_img
-        if Left_or_Right == 1:
-            result[0:image.shape[0],image.shape[1]:image.shape[1]*2] = out_img
-            
-       
-        
-        if showMe:
-            cv2.rectangle(out_img,
-                          (int(window['x0']), int(window['y0'] - window['height'])),
-                          (int(window['x0'] + window['width']), int(window['y0'])), (0, 255, 0), 2)
-
-            if step == 9:
-                plt.imshow(out_img)
-                plt.show()
-            
-            print(window['y0'])
-            plt.imshow(out_img)
-         
-        '''
-        # set next position of window and use standard sliding window width
-        window['width'] = sliding_window_specs['width']
-        window['x0'] = round(centroid - window['width'] / 2)
-        window['y0'] = window['y0'] - window['height']
-    return hotpixels_log, out_img
-
-
-
-
-def MahalanobisDist(x, y):
-    '''
-    Mahalanobis Distance for bi-variate distribution
-
-    '''
-    covariance_xy = np.cov(x, y, rowvar=0)
-    inv_covariance_xy = np.linalg.inv(covariance_xy)
-    xy_mean = np.mean(x), np.mean(y)
-    x_diff = np.array([x_i - xy_mean[0] for x_i in x])
-    y_diff = np.array([y_i - xy_mean[1] for y_i in y])
-    diff_xy = np.transpose([x_diff, y_diff])
-
-    md = []
-    for i in range(len(diff_xy)):
-        md.append(np.sqrt(np.dot(np.dot(np.transpose(diff_xy[i]), inv_covariance_xy), diff_xy[i])))
-    return md
-
-
-def MD_removeOutliers(x, y, MD_thresh):
-    '''
-    remove pixels outliers using Mahalonobis distance
-    '''
-    MD = MahalanobisDist(x, y)
-    threshold = np.mean(MD) * MD_thresh
-    nx, ny, outliers = [], [], []
-    for i in range(len(MD)):
-        if MD[i] <= threshold:
-            nx.append(x[i])
-            ny.append(y[i])
-        else:
-            outliers.append(i)
-    return (nx, ny)
-
-
-
-
-def update_tracker(tracker,new_value):
-    '''
-    update tracker(self.bestfit or self.bestfit_real or radO Curv or hotpixels) with new coeffs
-    new_coeffs is of the form {'a2':[val2,...],'a1':[va'1,...],'a0':[val0,...]}
-    tracker is of the form {'a2':[val2,...]}
-    update tracker of radius of curvature
-    update allx and ally with hotpixels coordinates from last sliding window
-    '''
-    allx = []
-    ally = []
-    if tracker =='bestfit':
-        bestfit['a0'].append(new_value['a0'])
-        bestfit['a1'].append(new_value['a1'])
-        bestfit['a2'].append(new_value['a2'])
-    elif tracker == 'bestfit_real':
-        bestfit_real['a0'].append(new_value['a0'])
-        bestfit_real['a1'].append(new_value['a1'])
-        bestfit_real['a2'].append(new_value['a2'])
-    elif tracker == 'radOfCurvature':
-        radOfCurv_tracker.append(new_value)
-    elif tracker == 'hotpixels':
-        allx.append(new_value['x'])
-        ally.append(new_value['y'])
-
-def polynomial_fit(data):
-    '''
-    多项式拟合
-    a0+a1 x+a2 x**2
-    data:dictionary with x and y values{'x':[],'y':[]}
-    '''
-    a2,a1,a0 = np.polyfit(data['x'],data['y'],2)
-    return {'a0':a0,'a1':a1,'a2':a2}
-
-
-def predict_line(x0,xmax,coeffs):
-    '''
-    predict road line using polyfit cofficient
-    x vaues are in range (x0,xmax)
-    polyfit coeffs:{'a2':,'a1':,'a2':}
-    returns array of [x,y] predicted points ,x along image vertical / y along image horizontal direction
-    '''
-    x_pts = np.linspace(x0,xmax-1,num=xmax)
-    pred = coeffs['a2']*x_pts**2+coeffs['a1']*x_pts+coeffs['a0']
-    return np.column_stack((x_pts,pred))
-
-
-def evaluate_fit(coeffs, row):
-    return coeffs['a2'] * row ** 2 + coeffs['a1'] * row + coeffs['a0']
-
-
-def clear_pending_right_fit():
-    right_lane_tracker['pending_fit'] = None
-    right_lane_tracker['pending_frames'] = 0
-
-
-def remember_pending_right_fit(candidate, sample_rows):
-    """Count consecutive, mutually consistent replacement candidates."""
-    candidate_samples = np.array([
-        evaluate_fit(candidate, row) for row in sample_rows])
-    pending = right_lane_tracker['pending_fit']
-    if pending is not None:
-        pending_samples = np.array([
-            evaluate_fit(pending, row) for row in sample_rows])
-        pending_matches = bool(np.max(np.abs(
-            candidate_samples - pending_samples)) <= RIGHT_PENDING_MATCH_PX)
-    else:
-        pending_matches = False
-
-    if pending_matches:
-        right_lane_tracker['pending_frames'] += 1
-    else:
-        right_lane_tracker['pending_fit'] = candidate.copy()
-        right_lane_tracker['pending_frames'] = 1
-    return right_lane_tracker['pending_frames']
-
-
-def hold_previous_right_fit(reason):
-    """Reject a frame without letting its pixels alter the trusted command."""
-    right_lane_tracker['lost_frames'] += 1
-    right_lane_tracker['force_global_search'] = True
-    return None, 'lost:' + reason
-
-
-def fit_samples(fit, image_height):
-    sample_rows = np.array([
-        image_height * 0.50,
-        image_height * 0.75,
-        image_height - 1.0])
-    return sample_rows, np.array([
-        evaluate_fit(fit, row) for row in sample_rows])
-
-
-def candidate_moves_to_outer(candidate, image_height):
-    """Reject a cumulative, near-parallel move away from the road interior."""
-    trusted = right_lane_tracker['trusted_fit']
-    if trusted is None:
-        return False, 0.0, 0.0, 0.0
-    sample_rows, candidate_samples = fit_samples(candidate, image_height)
-    unused, trusted_samples = fit_samples(trusted, image_height)
-    outward_delta = candidate_samples - trusted_samples
-    outward_min = float(np.min(outward_delta))
-    outward_shift = float(np.median(outward_delta))
-    outward_spread = float(np.max(outward_delta) - np.min(outward_delta))
-    rejected = bool(
-        outward_min > RIGHT_TRUSTED_OUTWARD_LIMIT_PX or
-        (outward_shift > RIGHT_TRUSTED_OUTWARD_LIMIT_PX and
-         outward_spread <= RIGHT_OUTWARD_PARALLEL_SPREAD_PX))
-    return rejected, outward_min, outward_shift, outward_spread
-
-
-def update_right_lane_fit(hotpixels, image_height, global_reacquire=False):
-    """Validate and smooth one right-boundary fit across consecutive frames."""
-    rows = np.asarray(hotpixels['x'])
-    columns = np.asarray(hotpixels['y'])
-    if rows.size < RIGHT_MIN_PIXELS:
-        clear_pending_right_fit()
-        return hold_previous_right_fit('few_pixels')
-
-    vertical_bins = np.unique(np.minimum(
-        (rows * 10 / image_height).astype(np.int32), 9))
-    if vertical_bins.size < RIGHT_MIN_VERTICAL_BINS:
-        clear_pending_right_fit()
-        reason = 'short_line:%dbins:%dpixels:rows%d-%d' % (
-            vertical_bins.size, rows.size, int(np.min(rows)), int(np.max(rows)))
-        return hold_previous_right_fit(reason)
-
-    candidate = polynomial_fit(hotpixels)
-    bottom_row = image_height - 1
-    far_row = int(image_height * 0.50)
-    bottom_x = evaluate_fit(candidate, bottom_row)
-    far_x = evaluate_fit(candidate, far_row)
-    if (not np.isfinite(bottom_x) or not np.isfinite(far_x) or
-            bottom_x < 640 * 0.45 or bottom_x >= 640 or
-            far_x < 220 or far_x >= 640):
-        clear_pending_right_fit()
-        return hold_previous_right_fit('bad_geometry')
-
-    previous = right_lane_tracker['fit']
-    trusted = right_lane_tracker['trusted_fit']
-
-    # At startup there is no safe command to preserve.  Confirm the same
-    # conservative inner candidate for several frames before accepting it.
-    if trusted is None:
-        sample_rows, unused = fit_samples(candidate, image_height)
-        if bottom_x > RIGHT_INITIAL_MAX_BOTTOM_X:
-            clear_pending_right_fit()
-            return hold_previous_right_fit('initial_outer_candidate')
-        stable_frames = remember_pending_right_fit(candidate, sample_rows)
-        if stable_frames < RIGHT_INITIAL_CONFIRM_FRAMES:
-            right_lane_tracker['force_global_search'] = True
-            right_lane_tracker['lost_frames'] += 1
-            return None, 'initializing:%d/%d' % (
-                stable_frames, RIGHT_INITIAL_CONFIRM_FRAMES)
-        right_lane_tracker['fit'] = candidate
-        right_lane_tracker['trusted_fit'] = candidate.copy()
-        right_lane_tracker['lost_frames'] = 0
-        right_lane_tracker['force_global_search'] = False
-        clear_pending_right_fit()
-        return candidate, 'initialized'
-
-    (outer_candidate, trusted_outward_min, trusted_outward_shift,
-     trusted_outward_spread) = candidate_moves_to_outer(
-         candidate, image_height)
-    if outer_candidate:
-        rospy.logwarn_throttle(
-            1.0, 'Reject outer-line drift: min=%.1f shift=%.1f spread=%.1f',
-            trusted_outward_min, trusted_outward_shift,
-            trusted_outward_spread)
-        return hold_previous_right_fit('outer_identity')
-
-    if global_reacquire and previous is not None:
-        sample_rows, unused = fit_samples(candidate, image_height)
-        stable_frames = remember_pending_right_fit(candidate, sample_rows)
-        if stable_frames < RIGHT_GLOBAL_REACQUIRE_FRAMES:
-            return hold_previous_right_fit('global_candidate')
-
-        right_lane_tracker['fit'] = candidate
-        right_lane_tracker['trusted_fit'] = candidate.copy()
-        right_lane_tracker['lost_frames'] = 0
-        right_lane_tracker['force_global_search'] = False
-        clear_pending_right_fit()
-        return candidate, 'reacquired:global_search'
-
-    if previous is not None:
-        previous_bottom_x = evaluate_fit(previous, bottom_row)
-        previous_far_x = evaluate_fit(previous, far_row)
-        sample_rows = np.array([
-            image_height * 0.50,
-            image_height * 0.75,
-            image_height - 1.0])
-        candidate_samples = np.array([
-            evaluate_fit(candidate, row) for row in sample_rows])
-        previous_samples = np.array([
-            evaluate_fit(previous, row) for row in sample_rows])
-        outward_delta = candidate_samples - previous_samples
-        outward_shift = float(np.median(outward_delta))
-        outward_spread = float(np.max(outward_delta) - np.min(outward_delta))
-
-        # A sudden, nearly parallel shift to the right is characteristic of
-        # switching from the inner lane stripe to the outer map border. Require
-        # the alternative to remain stable for several frames before accepting
-        # it. Genuine bends normally change the sampled shape non-uniformly.
-        if (outward_shift > RIGHT_OUTWARD_SWITCH_PX and
-                outward_spread <= RIGHT_OUTWARD_PARALLEL_SPREAD_PX):
-            remember_pending_right_fit(candidate, sample_rows)
-
-            # Never let a farther, parallel stripe take over automatically.
-            # If the inner stripe is really gone, stopping is safer than
-            # interpreting the map border as the lane boundary.
-            return hold_previous_right_fit('outward_candidate')
-
-        position_jump = (
-            abs(bottom_x - previous_bottom_x) > RIGHT_MAX_BOTTOM_JUMP_PX or
-            abs(far_x - previous_far_x) > RIGHT_MAX_FAR_JUMP_PX)
-        if position_jump:
-            stable_frames = remember_pending_right_fit(candidate, sample_rows)
-            if stable_frames < RIGHT_REACQUIRE_FRAMES:
-                return hold_previous_right_fit('position_jump')
-
-            # The old fit can become permanently stale after a real bend or
-            # after the vehicle is repositioned.  A replacement that remains
-            # geometrically valid and stable for several frames is safe to
-            # acquire, provided it was not the outward parallel map border
-            # rejected above.
-            right_lane_tracker['fit'] = candidate
-            right_lane_tracker['trusted_fit'] = candidate.copy()
-            right_lane_tracker['lost_frames'] = 0
-            right_lane_tracker['force_global_search'] = False
-            clear_pending_right_fit()
-            return candidate, 'reacquired:position_jump'
-
-        clear_pending_right_fit()
-
-        alpha = RIGHT_SMOOTHING_ALPHA
-        candidate = {
-            'a0': alpha * candidate['a0'] + (1.0 - alpha) * previous['a0'],
-            'a1': alpha * candidate['a1'] + (1.0 - alpha) * previous['a1'],
-            'a2': alpha * candidate['a2'] + (1.0 - alpha) * previous['a2']
-        }
-
-    right_lane_tracker['fit'] = candidate
-    # Small parallel outward movements do not move the identity anchor.  Thus
-    # several small steps cannot accumulate into an outer-border switch.
-    if previous is None or trusted_outward_shift <= 0.0 or \
-            trusted_outward_spread > RIGHT_OUTWARD_PARALLEL_SPREAD_PX:
-        right_lane_tracker['trusted_fit'] = candidate.copy()
-    right_lane_tracker['lost_frames'] = 0
-    right_lane_tracker['force_global_search'] = False
-    clear_pending_right_fit()
-    return candidate, 'tracked'
-
-
-class PID:
-    def __init__(self, P=0.2, I=0.0, D=0.0):
-        self.Kp = P
-        self.Ki = I
-        self.Kd = D
-        self.sample_time = 0.00
-        self.current_time = time.time()
-        self.last_time = self.current_time
-        self.clear()
-    def clear(self):
-        self.SetPoint = 0.0
-        self.PTerm = 0.0
-        self.ITerm = 0.0
-        self.DTerm = 0.0
+import cv2
+import numpy as np
+import rospy
+from ackermann_msgs.msg import AckermannDriveStamped
+from cv_bridge import CvBridge
+from sensor_msgs.msg import Image, CompressedImage, LaserScan
+from std_msgs.msg import Bool, String
+
+
+class LanePID(object):
+    def __init__(self, proportional_gain=2.5):
+        self.kp = float(proportional_gain)
+        self.last_time = time.time()
         self.last_error = 0.0
-        # Windup Guard
-        self.int_error = 0.0
-        self.windup_guard = 20.0
         self.output = 0.0
-    def update(self, feedback_value):     
-        error = self.SetPoint - feedback_value
-        self.current_time = time.time()
-        delta_time = self.current_time - self.last_time
-        delta_error = error - self.last_error
-        if (delta_time >= self.sample_time):
-            self.PTerm = self.Kp * error
-            self.ITerm += error * delta_time
-            if (self.ITerm < -self.windup_guard):
-                self.ITerm = -self.windup_guard
-            elif (self.ITerm > self.windup_guard):
-                self.ITerm = self.windup_guard
-            self.DTerm = 0.0
-            if delta_time > 0:
-                self.DTerm = delta_error / delta_time
-            self.last_time = self.current_time
-            self.last_error = error
-            self.output = self.PTerm + (self.Ki * self.ITerm) + (self.Kd * self.DTerm)
-    def setKp(self, proportional_gain):
-        self.Kp = proportional_gain
-    def setKi(self, integral_gain):
-        self.Ki = integral_gain
-    def setKd(self, derivative_gain):
-        self.Kd = derivative_gain
-    def setWindup(self, windup):     
-        self.windup_guard = windup
-    def setSampleTime(self, sample_time):
-        self.sample_time = sample_time
 
-def compute_radOfCurvature(coeffs,pt):
-    return ((1+(2*coeffs['a2']*pt+coeffs['a1'])**2)**1.5)/np.absolute(2*coeffs['a2'])
-def binarize(img):
-    """Binarize a grayscale image.
+    def clear(self):
+        self.last_time = time.time()
+        self.last_error = 0.0
+        self.output = 0.0
 
-    Binarize the input grayscale image by ostu threshold method.
-
-    Args:
-        img: an image. Grayscale image is preffered.
-
-    Returns:
-       img_binary: the binarized image
-    """
-
-    # Make sure that img_gray is a grayscale image.
-    if len(img.shape) == 2:
-        img_gray = img
-    elif len(img.shape) == 3 and img.shape[2] == 3:
-        img_gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
-    else:
-        #print("Converting image failed:", img.shape)
-        return None
-    # Apply the threshold method. It can be improved by changing the arguments.
-    _, img_binary = cv2.threshold(
-        img_gray, 170, 255, cv.THRESH_OTSU)
-
-    return img_binary
-
-def image_process(img):
-    """ Binarizes and skeletonizes the image.
-
-    Args:
-        img
-
-    Returns:
-        target_point
-    """
+    def update(self, feedback_value):
+        error = -float(feedback_value)
+        self.last_time = time.time()
+        self.last_error = error
+        self.output = self.kp*error
 
 
-    img_bin = binarize(img)
-    #cv.imshow('1',img_bin)
-    ele = cv2.getStructuringElement(cv.MORPH_ELLIPSE, (3, 3))
-    img_bin_rev = cv2.morphologyEx(255 - img_bin, cv.MORPH_OPEN, ele)
+class PreviousRightLaneTracker(object):
+    """Right-boundary tracker taken from the previous camera_cmd3 logic."""
 
-    img_bin_rev = cv2.medianBlur(img_bin_rev, 11)
-    white = cv2.countNonZero(img_bin_rev)
+    def __init__(self):
+        intrinsic = np.array([
+            [444.92179141947196, 0.0, 337.9399577215935],
+            [0.0, 443.59684870127415, 285.85005027454673],
+            [0.0, 0.0, 1.0]], dtype=np.float64)
+        distortion = np.array([
+            -0.41251110946304526,
+            0.3572865990594976,
+            0.0010943780467337042,
+            0.0007363828658040413,
+            -0.2652600879338458], dtype=np.float64)
+        self.src_points = np.float32([
+            [274, 195], [69, 301], [569, 305], [386, 197]])
+        destination = np.float32([
+            [170, 0], [170, 480], [470, 480], [470, 0]])
+        self.transform = cv2.getPerspectiveTransform(
+            self.src_points, destination)
+        self.inverse_transform = cv2.getPerspectiveTransform(
+            destination, self.src_points)
+        self.undistort_map1, self.undistort_map2 = (
+            cv2.initUndistortRectifyMap(
+                intrinsic, distortion, None, intrinsic,
+                (640, 480), cv2.CV_16SC2))
+        self.dilate_kernel = np.ones((15, 15), np.uint8)
+        self.erode_kernel = np.ones((7, 7), np.uint8)
 
-    skel = morphology.skeletonize(img_bin_rev//255).astype(np.uint8)*255
-    #cv.imshow('4',skel)
-    #img_bin_rev[skel == 255] = 120
+        self.lane_width_px = float(rospy.get_param(
+            '~lane_width_px', 300.0))
+        self.lane_width_tolerance_px = float(rospy.get_param(
+            '~lane_width_tolerance_px', 60.0))
+        self.target_center_correction_px = float(rospy.get_param(
+            '~target_center_correction_px', 3.0))
+        self.bird_fit_min_row = int(rospy.get_param(
+            '~bird_fit_min_row', 240))
+        self.control_near_min_row = int(rospy.get_param(
+            '~control_near_min_row', 360))
+        self.min_lane_pixels = int(rospy.get_param(
+            '~min_lane_pixels', 200))
+        self.right_search_inset_px = float(rospy.get_param(
+            '~right_search_inset_px', 30.0))
+        self.right_window_max_shift_px = float(rospy.get_param(
+            '~right_window_max_shift_px', 60.0))
+        self.right_fit_max_jump_px = float(rospy.get_param(
+            '~right_fit_max_jump_px', 45.0))
+        self.heading_gain = float(rospy.get_param(
+            '~heading_gain', 0.01))
+        self.heading_sample_row = int(rospy.get_param(
+            '~heading_sample_row', 405))
+        self.heading_max_command = float(rospy.get_param(
+            '~heading_max_command', 8.0))
+        self.curve_direction_threshold_px = float(rospy.get_param(
+            '~curve_direction_threshold_px', 50.0))
+        self.lane_loss_hold_seconds = float(rospy.get_param(
+            '~lane_loss_hold_seconds', 1.0))
+        self.lane_speed = float(rospy.get_param('~lane_speed', -37.0))
+        self.max_steering = float(rospy.get_param(
+            '~max_lane_steering', 25.0))
+        self.pid = LanePID(rospy.get_param('~lane_kp', 2.5))
+        self.previous_right_fit = None
+        self.right_lane_lost_frames = 0
+        self.right_lane_lost_since = None
+        self.last_valid_speed = 0.0
+        self.last_valid_steering = 0.0
+        self.has_last_valid_command = False
 
- 
-    return skel
-def lane_detection(img):
-    
-    corr_img = cv2.remap(img, UNDISTORT_MAP1, UNDISTORT_MAP2, cv2.INTER_LINEAR)
-    #cv2.imwrite('000.jpg',corr_img)
-    gray_ex = cv2.cvtColor(corr_img,cv2.COLOR_RGB2GRAY)
-    display(gray_ex,'Apply Camera Correction',color=0)
-    #ret, combined_output = cv2.threshold(gray_ex, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)
-    combined_output = cv2.Canny(gray_ex, 200, 400) #100, 200 75,200
-  
+    def reset(self):
+        self.previous_right_fit = None
+        self.right_lane_lost_frames = 0
+        self.right_lane_lost_since = None
+        self.last_valid_speed = 0.0
+        self.last_valid_steering = 0.0
+        self.has_last_valid_command = False
+        self.pid.clear()
 
+    @staticmethod
+    def fit_x(fit, rows):
+        return fit['a2']*rows**2 + fit['a1']*rows + fit['a0']
 
-    show_cv_window('combined_output', combined_output)
-    #combined_output = image_process(gray_ex)
-    display(combined_output,'Combined output',color=0)
-    mask = np.zeros_like(combined_output)
-    vertices = np.array([[(0,200),(0,479),(639,479),(639,200)]],dtype=np.int32)
-    cv2.fillPoly(mask,vertices,255)
+    def lane_pixels_valid(self, pixel_log, min_vertical_span=100):
+        rows = np.asarray(pixel_log['x'])
+        if len(rows) < self.min_lane_pixels:
+            return False
+        return (rows.max()-rows.min()) >= min_vertical_span
 
-    # Keep Canny as the lane detector because its contrast is reliable under
-    # the current lighting. The tracker selects the innermost edge identity.
-    cleaned = cv2.bitwise_and(combined_output, mask)
-    display(cleaned,'Masked Canny edges',color=0)
-    
-    min_sz = 50
-    #cleaned =              morphology.remove_small_objects(masked_image.astype('bool'),min_size=min_sz,connectivity=2)
-    # Keep adjacent Canny edges separate. The old 15x15 dilation could merge
-    # the lane marking with the farther map border.
-    warped_image = cv2.warpPerspective(
-        cleaned, TRANSFORM_MATRIX['M'],
-        (cleaned.shape[1], cleaned.shape[0]), flags=cv2.INTER_NEAREST)
-    close_kernel = cv2.getStructuringElement(
-        cv2.MORPH_RECT,
-        (right_edge_close_kernel_size, right_edge_close_kernel_size))
-    warped_image = cv2.morphologyEx(
-        warped_image, cv2.MORPH_CLOSE, close_kernel)
-    #pubbrid_view.publish(CvBridge().cv2_to_imgmsg(warped_image))
-    display(cleaned,'undistorted',color=0)
-    display(warped_image,'BirdViews',color=0)
-    mid_time=time.time()
-######mid_time
-    end_time=time.time()
-########################################################################fit##################################################################################
+    @staticmethod
+    def edge_candidates(histogram, peak_threshold,
+                        relative_threshold=0.30):
+        if histogram.size == 0:
+            return []
+        peak_value = float(np.max(histogram))
+        if peak_value <= peak_threshold:
+            return []
+        threshold = max(
+            float(peak_threshold), peak_value*relative_threshold)
+        strong = np.flatnonzero(histogram >= threshold)
+        if strong.size == 0:
+            return []
+        split_at = np.where(np.diff(strong) > 1)[0]+1
+        groups = np.split(strong, split_at)
+        candidates = []
+        for group in groups:
+            if group.size:
+                candidates.append((
+                    int(group[0]), float(np.max(histogram[group]))))
+        return candidates
 
-    peak_thresh = 10
-    showMe = 0
-    previous_fit = right_lane_tracker['fit']
-    sliding_window_specs = {'width': 60, 'n_steps': 10}
-    global_reacquire = bool(
-        previous_fit is not None and
-        (right_lane_tracker['force_global_search'] or
-         right_lane_tracker['lost_frames'] >=
-         RIGHT_GLOBAL_SEARCH_AFTER_LOST_FRAMES))
-    if (previous_fit is None or
-            right_lane_tracker['trusted_fit'] is None or
-            global_reacquire):
-        log_lineRight = find_innermost_right_track(
-            warped_image, sliding_window_specs)
-    else:
-        previous_bottom = evaluate_fit(previous_fit, warped_image.shape[0] - 1)
-        centroid_starter_right = {
-            'centroid': int(max(warped_image.shape[1] / 2,
-                                min(warped_image.shape[1] - 1, previous_bottom))),
-            'intensity': 1
-        }
-        log_lineRight, out_img = run_right_band_window(
-            warped_image.copy(), centroid_starter_right['centroid'],
-            sliding_window_specs, showMe=showMe)
+    def find_starter_near(self, image, expected_x, tolerance,
+                          peak_threshold):
+        x_start = max(0, int(round(expected_x-tolerance)))
+        x_end = min(
+            image.shape[1], int(round(expected_x+tolerance))+1)
+        for height in (48, 96, image.shape[0]//2, image.shape[0]):
+            crop = image[image.shape[0]-height:image.shape[0],
+                         x_start:x_end]
+            histogram = np.sum(crop, axis=0)
+            candidates = self.edge_candidates(
+                histogram, peak_threshold, 0.25)
+            if not candidates:
+                continue
+            expected_local = expected_x-x_start
+            edge_local, strength = min(
+                candidates,
+                key=lambda item: abs(item[0]-expected_local))
+            return {'centroid': x_start+edge_local,
+                    'intensity': strength}
+        return {'centroid': int(round(expected_x)), 'intensity': 0}
 
-    fit_lineRight_singleframe, tracking_status = update_right_lane_fit(
-        log_lineRight, corr_img.shape[0],
-        global_reacquire=global_reacquire)
+    def run_right_window(self, image, centroid_starter,
+                         peak_threshold=10):
+        steps = 10
+        height = int(round(float(image.shape[0])/steps))
+        max_shift = self.right_window_max_shift_px
+        window_width = max(90, 60, int(round(2.0*max_shift)))
+        center = float(centroid_starter)
+        last_center = None
+        hotpixels = {'x': [], 'y': []}
+        tracking_started = False
+        missing_windows = 0
+        for step in range(steps):
+            y_end = image.shape[0]-step*height
+            y_start = max(0, y_end-height)
+            predicted_center = center
+            if last_center is not None:
+                predicted_center = center+(center-last_center)
+            x_start = max(
+                0, int(round(predicted_center-window_width/2.0)))
+            x_end = min(image.shape[1], x_start+window_width)
+            if x_end-x_start < window_width:
+                x_start = max(0, x_end-window_width)
+            histogram = np.sum(
+                image[y_start:y_end, x_start:x_end], axis=0)
+            candidates = self.edge_candidates(
+                histogram, peak_threshold, 0.25)
+            if not candidates:
+                if tracking_started:
+                    missing_windows += 1
+                    if missing_windows >= 2:
+                        break
+                continue
+            predicted_local = predicted_center-x_start
+            edge_local, unused = min(
+                candidates,
+                key=lambda item: abs(item[0]-predicted_local))
+            inner_x = x_start+int(edge_local)
+            if abs(inner_x-predicted_center) > max_shift:
+                if tracking_started:
+                    missing_windows += 1
+                    if missing_windows >= 2:
+                        break
+                continue
+            if inner_x <= 6 or inner_x >= image.shape[1]-7:
+                break
+            support_start = max(x_start, inner_x-6)
+            support_end = min(x_end, inner_x+7)
+            hot_y, hot_x = np.nonzero(
+                image[y_start:y_end, support_start:support_end])
+            if hot_y.size == 0:
+                continue
+            hotpixels['x'].extend((hot_y+y_start).tolist())
+            hotpixels['y'].extend((hot_x+support_start).tolist())
+            last_center = center
+            center = float(inner_x)
+            tracking_started = True
+            missing_windows = 0
+        return hotpixels
 
-    msg = AckermannDriveStamped()
-    if fit_lineRight_singleframe is None:
-        result = corr_img.copy()
-        if right_lane_tracker['has_trusted_command']:
-            message = 'INNER LANE LOST - HOLD LAST'
-            msg.drive.speed = right_lane_tracker['last_speed']
-            msg.drive.steering_angle = right_lane_tracker['last_steering']
+    @staticmethod
+    def polynomial_fit(data):
+        a2, a1, a0 = np.polyfit(data['x'], data['y'], 2)
+        return {'a0': a0, 'a1': a1, 'a2': a2}
+
+    def make_bird_debug(self, warped, right_fit=None, status='',
+                        target_points=None, draw_rows=None):
+        bird = cv2.cvtColor(
+            np.uint8(np.clip(warped, 0, 255)), cv2.COLOR_GRAY2BGR)
+        if draw_rows is None:
+            rows = np.linspace(0, bird.shape[0]-1, num=bird.shape[0])
         else:
-            message = 'WAITING FOR INNER LANE'
-            msg.drive.speed = 0.0
-            msg.drive.steering_angle = 0.0
-        cv2.putText(result, message, (35, 60),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        cv2.putText(result, tracking_status, (35, 95),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
-        show_cv_window('result', result)
-        publish_trajectory_view(result)
-        pub.publish(msg)
-        rospy.logwarn_throttle(
-            1.0, 'Right lane rejected: %s; command speed=%.1f steering=%.2f',
-            tracking_status, msg.drive.speed, msg.drive.steering_angle)
-        return
+            rows = np.asarray(draw_rows)
+        if right_fit is not None:
+            right_x = self.fit_x(right_fit, rows)
+            right_path = np.column_stack(
+                (right_x, rows)).astype(np.int32).reshape((-1, 1, 2))
+            cv2.polylines(bird, [right_path], False, (0, 255, 0), 3)
+        if target_points is not None and len(target_points) >= 2:
+            center_path = np.asarray(
+                target_points).astype(np.int32).reshape((-1, 1, 2))
+            cv2.polylines(
+                bird, [center_path], False, (0, 0, 255), 7)
+        if status:
+            cv2.putText(
+                bird, status, (15, 32), cv2.FONT_HERSHEY_SIMPLEX,
+                0.65, (0, 0, 255), 2)
+        return bird
 
-    ym_per_pix = 0.6 / 480.0
-    xm_per_pix = 0.6 / LANE_WIDTH_PX
-    var_pts = np.linspace(0, corr_img.shape[0] - 1,
-                          num=corr_img.shape[0])
-    right_fitx = (fit_lineRight_singleframe['a2'] * var_pts ** 2 +
-                  fit_lineRight_singleframe['a1'] * var_pts +
-                  fit_lineRight_singleframe['a0'])
-    center_fitx = right_fitx - HALF_LANE_WIDTH_PX
-    center_of_lane = center_fitx[-1]
-    offset = (corr_img.shape[1] / 2.0 - center_of_lane) * xm_per_pix
+    def loss_result(self, reason, edges, warped):
+        now = time.time()
+        if self.right_lane_lost_since is None:
+            self.right_lane_lost_since = now
+        elapsed = now-self.right_lane_lost_since
+        holding = (
+            self.has_last_valid_command and
+            elapsed <= self.lane_loss_hold_seconds)
+        speed = self.last_valid_speed if holding else 0.0
+        steering = self.last_valid_steering if holding else 0.0
+        action = 'HOLD' if holding else 'STOP'
+        bird = self.make_bird_debug(
+            warped, status='RIGHT LANE LOST - '+action)
+        overlay = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        cv2.putText(
+            overlay, 'RIGHT LANE LOST - '+action, (15, 32),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 0, 255), 2)
+        return ({
+            'valid': holding,
+            'reason': reason+'_hold' if holding else reason,
+            'mode': 'right' if holding else 'none',
+            'speed': float(speed),
+            'steering': float(steering),
+            'loss_elapsed': float(elapsed)}, overlay, bird)
 
-    right_points = np.transpose(np.vstack([right_fitx, var_pts])).astype(np.int32)
-    center_points = np.transpose(np.vstack([center_fitx, var_pts])).astype(np.int32)
-    wrap_zero = np.zeros_like(gray_ex).astype(np.uint8)
-    color_wrap = np.dstack((wrap_zero, wrap_zero, wrap_zero))
-    cv2.polylines(color_wrap, [right_points], False, (0, 255, 0), 8)
-    cv2.polylines(color_wrap, [center_points], False, (0, 255, 255), 5)
-    cv2.line(color_wrap, (corr_img.shape[1] / 2, corr_img.shape[0] - 35),
-             (corr_img.shape[1] / 2, corr_img.shape[0] - 5), (0, 0, 255), 5)
-    newwrap = cv2.warpPerspective(
-        color_wrap, TRANSFORM_MATRIX['Minv'],
-        (corr_img.shape[1], corr_img.shape[0]))
-    result = cv2.addWeighted(corr_img, 1, newwrap, 0.8, 0)
-    cv2.putText(result, 'Right lane: ' + tracking_status, (30, 40),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-    cv2.putText(result, 'Offset: ' + str(round(offset, 3)) + 'm', (30, 75),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-    show_cv_window('result', result)
-    publish_trajectory_view(result)
+    def detect(self, frame, stamp):
+        corrected = cv2.remap(
+            frame, self.undistort_map1, self.undistort_map2,
+            cv2.INTER_LINEAR)
+        gray = cv2.cvtColor(corrected, cv2.COLOR_RGB2GRAY)
+        edges = cv2.Canny(gray, 200, 400)
+        mask = np.zeros_like(edges)
+        roi_top = max(
+            0, int(np.floor(np.min(self.src_points[:, 1])))-5)
+        vertices = np.array([[
+            (0, roi_top), (0, edges.shape[0]-1),
+            (edges.shape[1]-1, edges.shape[0]-1),
+            (edges.shape[1]-1, roi_top)]], dtype=np.int32)
+        cv2.fillPoly(mask, vertices, 255)
+        cleaned = cv2.bitwise_and(edges, mask)
+        warped = cv2.warpPerspective(
+            cleaned.astype(np.float32), self.transform,
+            (cleaned.shape[1], cleaned.shape[0]),
+            flags=cv2.INTER_LINEAR)
+        warped = cv2.dilate(warped, self.dilate_kernel)
+        warped = cv2.erode(warped, self.erode_kernel)
+        tracking = warped.copy()
+        fit_min = max(
+            0, min(tracking.shape[0]-1, self.bird_fit_min_row))
+        tracking[:fit_min, :] = 0
 
-    print('right_lane_status', tracking_status)
-    print('right_lane_pixels', len(log_lineRight['x']))
-    print('offset ', offset)
-    msg.drive.speed = -37
-    # Keep the existing lateral controller; only its lane centre source changed.
-    Vehicle_PID.update(offset)
-    steering_command = -Vehicle_PID.output * 40.0
-    msg.drive.steering_angle = max(-25.0, min(25.0, steering_command))
-    right_lane_tracker['last_speed'] = msg.drive.speed
-    right_lane_tracker['last_steering'] = msg.drive.steering_angle
-    right_lane_tracker['has_trusted_command'] = True
-    print('steering_angle', msg.drive.steering_angle)
-    pub.publish(msg)
+        calibrated_right_x = (
+            tracking.shape[1]/2.0+self.lane_width_px/2.0)
+        expected_right_x = (
+            calibrated_right_x-self.right_search_inset_px)
+        starter = self.find_starter_near(
+            tracking, expected_right_x,
+            self.lane_width_tolerance_px+40.0, 10)
+        right_pixels = self.run_right_window(
+            tracking, starter['centroid'], 10)
+        if not self.lane_pixels_valid(right_pixels, 100):
+            self.right_lane_lost_frames += 1
+            if self.right_lane_lost_frames >= 3:
+                self.previous_right_fit = None
+            return self.loss_result(
+                'right_lane_pixels_missing', edges, warped)
 
-def camera_callback(data):
-    time1 = time.time()
-    img = CvBridge().imgmsg_to_cv2(data, "bgr8")
-    global n
-    print(laser_cmd)
-    if laser_cmd == 0:
-        if n >= 1:
-            lane_detection(img)
+        candidate = self.polynomial_fit(right_pixels)
+        detected_rows = np.asarray(right_pixels['x'], dtype=np.float64)
+        detected_cols = np.asarray(right_pixels['y'], dtype=np.float64)
+        residual = float(np.median(np.abs(
+            detected_cols-self.fit_x(candidate, detected_rows))))
+        fit_check_min = max(
+            float(detected_rows.min()),
+            min(float(self.control_near_min_row),
+                float(detected_rows.max())-30.0))
+        fit_check_rows = np.linspace(
+            fit_check_min, float(detected_rows.max()), num=20)
+        bottom_row = float(corrected.shape[0]-1)
+        bottom_x = float(self.fit_x(candidate, bottom_row))
+        fit_jump = 0.0
+        if self.previous_right_fit is not None:
+            fit_jump = float(np.max(np.abs(
+                self.fit_x(candidate, fit_check_rows)-
+                self.fit_x(self.previous_right_fit, fit_check_rows))))
+        geometry_ok = (
+            residual <= 12.0 and
+            180.0 <= bottom_x <= warped.shape[1]-20.0)
+        if not geometry_ok:
+            self.right_lane_lost_frames += 1
+            if self.right_lane_lost_frames >= 3:
+                self.previous_right_fit = None
+            return self.loss_result(
+                'right_lane_geometry_rejected', edges, warped)
+
+        temporal_jump = (
+            self.previous_right_fit is not None and
+            fit_jump > self.right_fit_max_jump_px)
+        if temporal_jump:
+            self.right_lane_lost_frames += 1
+            if self.right_lane_lost_frames < 3:
+                candidate = self.previous_right_fit.copy()
+                detected_cols = self.fit_x(candidate, detected_rows)
+            else:
+                self.previous_right_fit = None
+                return self.loss_result(
+                    'right_lane_reacquire', edges, warped)
         else:
-            n += 1
-    time2 = time.time()
-    print('totaltime', time2-time1)
+            self.previous_right_fit = candidate.copy()
+            self.right_lane_lost_frames = 0
+            self.right_lane_lost_since = None
+
+        row_min = max(0.0, float(detected_rows.min()))
+        row_max = min(
+            float(corrected.shape[0]-1), float(detected_rows.max()))
+        rows = np.linspace(
+            row_min, row_max,
+            num=max(2, int(row_max-row_min)+1))
+        right_fit_x = self.fit_x(candidate, rows)
+        near_mask = detected_rows >= float(self.control_near_min_row)
+        near_valid = (
+            np.count_nonzero(near_mask) >= 30 and
+            np.ptp(detected_rows[near_mask]) >= 60.0)
+        if near_valid:
+            near_fit = np.polyfit(
+                detected_rows[near_mask], detected_cols[near_mask], 1)
+            control_min = max(
+                row_min, float(self.control_near_min_row))
+            control_rows = np.linspace(
+                control_min, row_max,
+                num=max(2, int(row_max-control_min)+1))
+            control_right_x = np.polyval(near_fit, control_rows)
+            right_bottom_x = float(np.polyval(near_fit, bottom_row))
+        else:
+            control_rows = rows
+            control_right_x = right_fit_x
+            right_bottom_x = float(self.fit_x(candidate, bottom_row))
+
+        target_x = (
+            control_right_x-self.lane_width_px/2.0+
+            self.target_center_correction_px)
+        target_valid = (
+            (target_x >= 0.0) & (target_x < corrected.shape[1]) &
+            (control_rows >= 0.0) &
+            (control_rows < corrected.shape[0]))
+        target_points = np.column_stack(
+            (target_x[target_valid], control_rows[target_valid]))
+        target_bottom_x = (
+            right_bottom_x-self.lane_width_px/2.0+
+            self.target_center_correction_px)
+        metres_per_pixel = 0.6/self.lane_width_px
+        offset = (
+            corrected.shape[1]/2.0-target_bottom_x)*metres_per_pixel
+
+        bird = self.make_bird_debug(
+            warped, candidate, 'RIGHT LINE ONLY', target_points, rows)
+        overlay = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        right_path = np.column_stack(
+            (right_fit_x, rows)).astype(np.int32).reshape((-1, 1, 2))
+        bird_overlay = np.zeros_like(overlay)
+        cv2.polylines(
+            bird_overlay, [right_path], False, (0, 255, 0), 3)
+        if len(target_points) >= 2:
+            center_path = target_points.astype(
+                np.int32).reshape((-1, 1, 2))
+            cv2.polylines(
+                bird_overlay, [center_path], False, (0, 0, 255), 7)
+        camera_overlay = cv2.warpPerspective(
+            bird_overlay, self.inverse_transform,
+            (corrected.shape[1], corrected.shape[0]),
+            flags=cv2.INTER_NEAREST)
+        path_mask = np.any(camera_overlay != 0, axis=2)
+        overlay[path_mask] = camera_overlay[path_mask]
+
+        self.pid.update(offset)
+        lateral_command = -self.pid.output*40.0
+        heading_row = max(
+            row_min, min(float(self.heading_sample_row), row_max))
+        right_ahead_x = float(self.fit_x(candidate, heading_row))
+        path_delta_x = right_ahead_x-right_bottom_x
+        heading_command = max(
+            -self.heading_max_command,
+            min(self.heading_max_command,
+                -self.heading_gain*path_delta_x))
+        steering_command = lateral_command+heading_command
+        if path_delta_x < -self.curve_direction_threshold_px:
+            steering_command = max(0.0, steering_command)
+        elif path_delta_x > self.curve_direction_threshold_px:
+            steering_command = min(0.0, steering_command)
+        logical_steering = max(
+            -self.max_steering,
+            min(self.max_steering, steering_command))
+        output_steering = -logical_steering
+        self.last_valid_speed = self.lane_speed
+        self.last_valid_steering = output_steering
+        self.has_last_valid_command = True
+        return ({
+            'valid': True,
+            'reason': 'tracking_previous_right_line',
+            'mode': 'right',
+            'speed': float(self.lane_speed),
+            'steering': float(output_steering),
+            'offset': float(offset),
+            'lateral_command': float(lateral_command),
+            'heading_command': float(heading_command),
+            'path_delta_x': float(path_delta_x),
+            'fit_residual': float(residual),
+            'fit_jump': float(fit_jump)}, overlay, bird)
 
 
-def laser_callback(data):
-    global laser_cmd
-    laser_cmd = data.laser_control
-    
+FOLLOW = 'FOLLOW'
+AVOID_OUT = 'AVOID_OUT'
+AVOID_ALIGN = 'AVOID_ALIGN'
+PASS_OBSTACLE = 'PASS_OBSTACLE'
+RETURN_IN = 'RETURN_IN'
+RETURN_ALIGN = 'RETURN_ALIGN'
+RECOVER = 'RECOVER'
+RECOVER_BLEND = 'RECOVER_BLEND'
+STOPPED = 'STOPPED'
 
 
-def detector():
+class CameraLaneAvoidance(object):
+    def __init__(self, ready_file=None):
+        self.lock = threading.RLock()
+        self.tracker_lock = threading.Lock()
+        self.bridge = CvBridge()
+        self.tracker = PreviousRightLaneTracker()
 
-    global pub
-    global pubresult
-    global Vehicle_PID
-    global show_windows
-    global right_edge_close_kernel_size
+        self.camera_topic = rospy.get_param(
+            '~camera_topic', '/usb_cam_2/image')
+        self.scan_topic = rospy.get_param('~scan_topic', '/scan')
+        self.output_topic = rospy.get_param(
+            '~output_topic', '/ackermann_cmd')
 
-    Vehicle_PID = PID(3,0,0)
-    rospy.init_node('camera_cmd4', anonymous=False)
-    camera_topic = rospy.get_param('~camera_topic', '/usb_cam_2/image')
-    show_windows = rospy.get_param('~show_windows', False)
-    right_edge_close_kernel_size = int(rospy.get_param(
-        '~right_edge_close_kernel_size', 3))
-    right_edge_close_kernel_size = max(1, right_edge_close_kernel_size)
-    if right_edge_close_kernel_size % 2 == 0:
-        right_edge_close_kernel_size += 1
-    rospy.loginfo('Front lane camera: %s (640x480 calibration)', camera_topic)
-    rospy.loginfo('Right Canny-edge close kernel: %d',
-                  right_edge_close_kernel_size)
-    pub = rospy.Publisher('/ackermann_cmd', AckermannDriveStamped, queue_size=1)
-    pubresult = rospy.Publisher(
-        '/camera_cmd4/trajectory/compressed', CompressedImage, queue_size=1)
-    rospy.Subscriber(camera_topic, Image, camera_callback, queue_size=1, buff_size=2**24)
-    rospy.Subscriber("/laser_control", laser_control, laser_callback, queue_size=1)
-    if show_windows:
-        run_debug_window_loop()
-    else:
-        rospy.spin()
+        # Current STM32 convention: positive=right and negative=left.
+        self.avoid_left = bool(rospy.get_param('~avoid_left', True))
+        self.avoid_speed = float(rospy.get_param('~avoid_speed', -15.0))
+        self.turn_angle = float(rospy.get_param('~turn_angle', 12.0))
+        self.out_duration = float(rospy.get_param('~out_duration', 0.55))
+        self.align_duration = float(
+            rospy.get_param('~align_duration', 0.55))
+        self.pass_min_duration = float(
+            rospy.get_param('~pass_min_duration', 0.50))
+        self.pass_max_duration = float(
+            rospy.get_param('~pass_max_duration', 2.50))
+        self.return_duration = float(
+            rospy.get_param('~return_duration', 0.55))
+        self.return_align_duration = float(
+            rospy.get_param('~return_align_duration', 0.55))
+        self.recover_timeout = float(
+            rospy.get_param('~recover_timeout', 3.0))
+        self.blend_duration = float(
+            rospy.get_param('~blend_duration', 0.50))
+
+        # This car's 1440-point LS01B scan faces forward at index 720.
+        self.front_index_ratio = float(
+            rospy.get_param('~front_index_ratio', 0.5))
+        self.obstacle_distance = float(
+            rospy.get_param('~obstacle_distance', 0.90))
+        self.clear_distance = float(
+            rospy.get_param('~clear_distance', 1.05))
+        self.corridor_half_width = float(
+            rospy.get_param('~corridor_half_width', 0.32))
+        self.obstacle_min_points = int(
+            rospy.get_param('~obstacle_min_points', 6))
+        self.obstacle_confirm_frames = int(
+            rospy.get_param('~obstacle_confirm_frames', 2))
+        self.clear_confirm_frames = int(
+            rospy.get_param('~clear_confirm_frames', 3))
+        self.side_distance = float(
+            rospy.get_param('~side_distance', 0.65))
+        self.side_min_points = int(
+            rospy.get_param('~side_min_points', 8))
+        self.side_clear_points = int(
+            rospy.get_param('~side_clear_points', 3))
+
+        self.image_timeout = float(
+            rospy.get_param('~image_timeout', 0.35))
+        self.scan_timeout = float(
+            rospy.get_param('~scan_timeout', 0.40))
+        self.recover_confirm_frames = int(
+            rospy.get_param('~recover_confirm_frames', 8))
+        self.recover_max_step = float(
+            rospy.get_param('~recover_max_steering_step', 4.0))
+        self.recover_max_delta = float(
+            rospy.get_param('~recover_max_steering_delta', 12.0))
+
+        self.state = FOLLOW
+        self.state_started = time.time()
+        self.last_image_time = 0.0
+        self.last_scan_time = 0.0
+        self.latest_lane_cmd = None
+        self.latest_lane_result = None
+        self.lane_valid = False
+        self.preavoid_steering = 0.0
+        self.recover_last_steering = None
+        self.recover_frames = 0
+
+        self.blocked_frames = 0
+        self.side_clear_frames = 0
+        self.side_seen = False
+        self.front_blocked = False
+        self.front_clear = True
+        self.front_points = 0
+        self.side_points = 0
+
+        self.cmd_pub = rospy.Publisher(
+            self.output_topic, AckermannDriveStamped, queue_size=1)
+        self.trajectory_pub = rospy.Publisher(
+            '/camera_cmd5/trajectory/compressed',
+            CompressedImage, queue_size=1)
+        self.bird_pub = rospy.Publisher(
+            '/camera_cmd5/bird/compressed',
+            CompressedImage, queue_size=1)
+        self.status_pub = rospy.Publisher(
+            '/camera_cmd5/status', String, queue_size=1)
+
+        self.image_sub = rospy.Subscriber(
+            self.camera_topic, Image,
+            self.camera_callback, queue_size=1, buff_size=2**24)
+        self.scan_sub = rospy.Subscriber(
+            self.scan_topic, LaserScan,
+            self.scan_callback, queue_size=1)
+        self.reset_sub = rospy.Subscriber(
+            '/camera_cmd5/reset', Bool,
+            self.reset_callback, queue_size=1)
+
+        self.timer = rospy.Timer(
+            rospy.Duration(0.05), self.control_timer)
+        rospy.on_shutdown(self.shutdown)
+        if ready_file:
+            with open(ready_file, 'w') as stream:
+                stream.write('ready\n')
+        rospy.loginfo(
+            'camera_cmd5 ready: camera=%s scan=%s output=%s avoid_left=%s',
+            self.camera_topic, self.scan_topic,
+            self.output_topic, self.avoid_left)
+
+    def transition(self, state, reason):
+        if self.state == state:
+            return
+        rospy.logwarn(
+            'Avoidance state %s -> %s: %s',
+            self.state, state, reason)
+        self.state = state
+        self.state_started = time.time()
+        if state == PASS_OBSTACLE:
+            self.side_seen = False
+            self.side_clear_frames = 0
+        elif state == RECOVER:
+            self.recover_frames = 0
+            self.recover_last_steering = None
+            self.lane_valid = False
+            self.latest_lane_cmd = None
+            # Discard any adjacent lane tracked while passing the obstacle.
+            with self.tracker_lock:
+                self.tracker.reset()
+
+    def make_command(self, speed=0.0, steering=0.0):
+        cmd = AckermannDriveStamped()
+        cmd.header.stamp = rospy.Time.now()
+        cmd.drive.speed = speed
+        cmd.drive.steering_angle = steering
+        return cmd
+
+    def compressed(self, publisher, frame, header):
+        if publisher.get_num_connections() == 0:
+            return
+        ok, encoded = cv2.imencode(
+            '.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        if ok:
+            message = CompressedImage()
+            message.header = header
+            message.format = 'jpeg'
+            message.data = encoded.tobytes()
+            publisher.publish(message)
+
+    def update_recovery(self, result):
+        steering = float(result.get('steering', 0.0))
+        valid = bool(result.get('valid', False))
+        consistent = (
+            abs(steering-self.preavoid_steering) <=
+            self.recover_max_delta)
+        stable = (
+            self.recover_last_steering is None or
+            abs(steering-self.recover_last_steering) <=
+            self.recover_max_step)
+        if valid and consistent and stable:
+            self.recover_frames += 1
+            self.recover_last_steering = steering
+        else:
+            self.recover_frames = 0
+            self.recover_last_steering = None
+        if self.recover_frames >= self.recover_confirm_frames:
+            self.transition(
+                RECOVER_BLEND,
+                'right lane stable for %d frames' %
+                self.recover_frames)
+
+    def camera_callback(self, message):
+        started = time.time()
+        stamp = message.header.stamp.to_sec()
+        if not -0.1 <= started-stamp <= self.image_timeout:
+            with self.lock:
+                self.lane_valid = False
+            rospy.logwarn_throttle(
+                1.0, 'camera_cmd5 rejected a stale camera frame')
+            return
+        try:
+            frame = self.bridge.imgmsg_to_cv2(
+                message, 'bgr8')
+            if frame.shape != (480, 640, 3):
+                raise ValueError(
+                    'Calibration requires a 640x480 image')
+            with self.tracker_lock:
+                result, overlay, bird = self.tracker.detect(
+                    frame, stamp)
+        except Exception as exc:
+            with self.lock:
+                self.lane_valid = False
+            rospy.logerr_throttle(
+                1.0, 'Curve detection failed: %s', exc)
+            return
+
+        result['capture_stamp'] = stamp
+        result['processing_ms'] = (
+            time.time()-started)*1000.0
+        with self.lock:
+            self.last_image_time = time.time()
+            self.latest_lane_result = result
+            self.lane_valid = bool(result.get('valid', False))
+            if self.lane_valid:
+                lane_cmd = AckermannDriveStamped()
+                lane_cmd.header = message.header
+                lane_cmd.drive.speed = float(result['speed'])
+                lane_cmd.drive.steering_angle = float(
+                    result['steering'])
+                self.latest_lane_cmd = lane_cmd
+            else:
+                self.latest_lane_cmd = None
+
+            if self.state == RECOVER:
+                self.update_recovery(result)
+
+            state_snapshot = self.state
+            result['avoidance_state'] = state_snapshot
+            result['front_blocked'] = self.front_blocked
+            result['front_points'] = self.front_points
+            result['side_points'] = self.side_points
+
+        self.status_pub.publish(
+            String(data=json.dumps(result)))
+        self.compressed(
+            self.trajectory_pub, overlay, message.header)
+        self.compressed(
+            self.bird_pub, bird, message.header)
+        rospy.loginfo_throttle(
+            0.5,
+            'cmd5 lane=%s mode=%s state=%s speed=%.0f steer=%+.1f time=%.0fms',
+            result['reason'], result['mode'], state_snapshot,
+            result['speed'], result['steering'],
+            result['processing_ms'])
+
+    def relative_angle(self, index, count, increment):
+        centre = self.front_index_ratio*float(count)
+        return (float(index)-centre)*abs(increment)
+
+    def scan_metrics(self, scan):
+        count = len(scan.ranges)
+        if count == 0:
+            return 0, 0, 0
+
+        front_points = 0
+        clear_points = 0
+        side_points = 0
+        for index, distance in enumerate(scan.ranges):
+            if ((math.isinf(distance) or math.isnan(distance)) or
+                    distance <= max(0.03, scan.range_min) or
+                    distance >= scan.range_max):
+                continue
+            angle = self.relative_angle(
+                index, count, scan.angle_increment)
+            if not -math.pi <= angle <= math.pi:
+                continue
+            forward = distance*math.cos(angle)
+            lateral = distance*math.sin(angle)
+            if (0.05 < forward < self.obstacle_distance and
+                    abs(lateral) < self.corridor_half_width):
+                front_points += 1
+            if (0.05 < forward < self.clear_distance and
+                    abs(lateral) < self.corridor_half_width):
+                clear_points += 1
+
+            angle_deg = angle*180.0/math.pi
+            if self.avoid_left:
+                obstacle_side = -120.0 < angle_deg < -20.0
+            else:
+                obstacle_side = 20.0 < angle_deg < 120.0
+            if obstacle_side and distance < self.side_distance:
+                side_points += 1
+        return front_points, clear_points, side_points
+
+    def scan_callback(self, scan):
+        with self.lock:
+            now = time.time()
+            self.last_scan_time = now
+            front_points, clear_points, side_points = (
+                self.scan_metrics(scan))
+            self.front_points = front_points
+            self.side_points = side_points
+            self.front_blocked = (
+                front_points >= self.obstacle_min_points)
+            self.front_clear = (
+                clear_points <= self.side_clear_points)
+
+            if self.state == FOLLOW:
+                if self.front_blocked:
+                    self.blocked_frames += 1
+                else:
+                    self.blocked_frames = 0
+                if self.blocked_frames >= self.obstacle_confirm_frames:
+                    if self.latest_lane_cmd is not None:
+                        self.preavoid_steering = (
+                            self.latest_lane_cmd.drive.steering_angle)
+                    else:
+                        self.preavoid_steering = 0.0
+                    self.transition(
+                        AVOID_OUT,
+                        'front obstacle confirmed (%d points)' %
+                        front_points)
+            elif self.state == PASS_OBSTACLE:
+                if side_points >= self.side_min_points:
+                    self.side_seen = True
+                    self.side_clear_frames = 0
+                elif (self.side_seen and
+                      side_points <= self.side_clear_points):
+                    self.side_clear_frames += 1
+                else:
+                    self.side_clear_frames = 0
+                if (now-self.state_started >=
+                        self.pass_min_duration and
+                        self.front_clear and
+                        self.side_seen and
+                        self.side_clear_frames >=
+                        self.clear_confirm_frames):
+                    self.transition(
+                        RETURN_IN,
+                        'obstacle passed the side of the car')
+
+    def avoidance_command(self):
+        out_sign = -1.0 if self.avoid_left else 1.0
+        if self.state == AVOID_OUT:
+            return self.make_command(
+                self.avoid_speed,
+                out_sign*self.turn_angle)
+        if self.state == AVOID_ALIGN:
+            return self.make_command(
+                self.avoid_speed,
+                -out_sign*self.turn_angle)
+        if self.state == PASS_OBSTACLE:
+            return self.make_command(
+                self.avoid_speed, 0.0)
+        if self.state == RETURN_IN:
+            return self.make_command(
+                self.avoid_speed,
+                -out_sign*self.turn_angle)
+        if self.state == RETURN_ALIGN:
+            return self.make_command(
+                self.avoid_speed,
+                out_sign*self.turn_angle)
+        return self.make_command()
+
+    def reset_callback(self, message):
+        if not message.data:
+            return
+        with self.lock:
+            if self.front_clear:
+                self.blocked_frames = 0
+                with self.tracker_lock:
+                    self.tracker.reset()
+                self.transition(FOLLOW, 'manual reset')
+            else:
+                rospy.logwarn(
+                    'Reset refused: forward corridor occupied')
+
+    def control_timer(self, unused):
+        with self.lock:
+            now = time.time()
+            elapsed = now-self.state_started
+
+            if (self.state == AVOID_OUT and
+                    elapsed >= self.out_duration):
+                self.transition(
+                    AVOID_ALIGN,
+                    'outward steering duration complete')
+                elapsed = 0.0
+            elif (self.state == AVOID_ALIGN and
+                  elapsed >= self.align_duration):
+                self.transition(
+                    PASS_OBSTACLE,
+                    'vehicle aligned beside obstacle')
+                elapsed = 0.0
+            elif (self.state == PASS_OBSTACLE and
+                  elapsed >= self.pass_max_duration):
+                if self.front_clear:
+                    self.transition(
+                        RETURN_IN,
+                        'pass timeout with front corridor clear')
+                else:
+                    self.transition(
+                        STOPPED,
+                        'pass timeout while obstacle remains ahead')
+                elapsed = 0.0
+            elif (self.state == RETURN_IN and
+                  elapsed >= self.return_duration):
+                self.transition(
+                    RETURN_ALIGN,
+                    'return steering duration complete')
+                elapsed = 0.0
+            elif (self.state == RETURN_ALIGN and
+                  elapsed >= self.return_align_duration):
+                self.transition(
+                    RECOVER,
+                    'returned to estimated original corridor')
+                elapsed = 0.0
+            elif (self.state == RECOVER and
+                  elapsed >= self.recover_timeout):
+                self.transition(
+                    STOPPED,
+                    'original lane was not confirmed')
+                elapsed = 0.0
+            elif (self.state == RECOVER_BLEND and
+                  elapsed >= self.blend_duration):
+                self.transition(
+                    FOLLOW,
+                    'lane controller takeover complete')
+                elapsed = 0.0
+
+            avoiding = self.state in (
+                AVOID_OUT, AVOID_ALIGN, PASS_OBSTACLE,
+                RETURN_IN, RETURN_ALIGN)
+            if (avoiding and
+                    now-self.last_scan_time > self.scan_timeout):
+                self.transition(
+                    STOPPED, 'laser scan timeout')
+
+            if self.state == FOLLOW:
+                image_fresh = (
+                    now-self.last_image_time <=
+                    self.image_timeout)
+                # Stop while the next scan confirms an obstacle candidate.
+                if self.blocked_frames > 0:
+                    command = self.make_command()
+                elif (image_fresh and self.lane_valid and
+                        self.latest_lane_cmd is not None):
+                    command = copy.deepcopy(
+                        self.latest_lane_cmd)
+                else:
+                    command = self.make_command()
+            elif self.state == RECOVER_BLEND:
+                image_fresh = (
+                    now-self.last_image_time <=
+                    self.image_timeout)
+                if (not image_fresh or not self.lane_valid or
+                        self.latest_lane_cmd is None):
+                    self.transition(
+                        STOPPED,
+                        'lane lost during takeover')
+                    command = self.make_command()
+                else:
+                    ratio = min(
+                        1.0,
+                        elapsed/max(0.01, self.blend_duration))
+                    command = self.make_command(
+                        self.avoid_speed*(1.0-ratio) +
+                        self.latest_lane_cmd.drive.speed*ratio,
+                        self.latest_lane_cmd.drive.steering_angle*
+                        ratio)
+            elif avoiding:
+                command = self.avoidance_command()
+            else:
+                command = self.make_command()
+
+            self.cmd_pub.publish(command)
+            rospy.loginfo_throttle(
+                0.5,
+                'cmd5 state=%s obstacle=%d side=%d lane=%s speed=%.0f steer=%+.1f',
+                self.state, self.front_points,
+                self.side_points, self.lane_valid,
+                command.drive.speed,
+                command.drive.steering_angle)
+
+    def shutdown(self):
+        with self.lock:
+            self.cmd_pub.publish(self.make_command())
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--ready-file')
+    args = parser.parse_args(rospy.myargv()[1:])
+    rospy.init_node('camera_cmd5')
+    CameraLaneAvoidance(args.ready_file)
+    rospy.spin()
+
 
 if __name__ == '__main__':
-    detector()
+    main()
