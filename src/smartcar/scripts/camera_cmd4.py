@@ -777,9 +777,9 @@ class CameraLaneAvoidance(object):
                 '~right_duration', 1.5, 0.1, 4.0),
             'left_speed': intersection_forward_speed,
             'left_angle': self.bounded_param(
-                '~left_angle', -16.0, -25.0, -3.0),
+                '~left_angle', -13.0, -25.0, -3.0),
             'left_duration': self.bounded_param(
-                '~left_duration', 1.5, 0.1, 4.0),
+                '~left_duration', 2.5, 0.1, 4.0),
             'uturn_forward_speed': intersection_forward_speed,
             'uturn_forward_angle': self.bounded_param(
                 '~uturn_forward_angle', 20.0, 3.0, 25.0),
