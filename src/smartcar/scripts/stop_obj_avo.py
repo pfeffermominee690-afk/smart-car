@@ -8,7 +8,7 @@ import rospy
 from std_msgs.msg import String
 from std_msgs.msg import Bool
 from std_msgs.msg import Int8
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge, CvBridgeError
 from ackermann_msgs.msg import AckermannDriveStamped
 import argparse
@@ -93,6 +93,9 @@ distortionCoe = np.array([-0.4119,0.1709,0,0.0011, 0.018])
 src_pts = np.float32([[108,378],[1,435],[639,435],[508,378]])
 dst_pts = np.float32([[150,0],[150,480],[490,480],[490,0]])   #dst_pts = np.float32([[70,0],[70,480],[570,480],[570,0]])
 showMe = 0
+blue_debug_pub = None
+blue_debug_rate = 8.0
+last_blue_debug_publish = 0.0
 
 
 #net = jetson.inference.imageNet("resnet-18",labels="labels.txt")
@@ -438,7 +441,79 @@ def yolov5detection():
 
 
 
-def blue_line(img):
+def publish_blue_line_debug(corrected, small_shape, crop_y0, blue_mask,
+                            k, c0, mid_x, mid_y, leng, count_blue, header=None):
+    """Publish the exact blue-line decision as an annotated camera frame."""
+    global last_blue_debug_publish
+    if blue_debug_pub is None or blue_debug_pub.get_num_connections() <= 0:
+        return
+    now = time.time()
+    if blue_debug_rate > 0 and now - last_blue_debug_publish < 1.0 / blue_debug_rate:
+        return
+    last_blue_debug_publish = now
+
+    overlay = corrected.copy()
+    small_h, small_w = small_shape
+    scale_x = overlay.shape[1] / float(small_w)
+    scale_y = overlay.shape[0] / float(small_h)
+    roi_left = 0
+    roi_top = int(round(crop_y0 * scale_y))
+    roi_right = min(overlay.shape[1], int(round(blue_mask.shape[1] * scale_x)))
+    roi_bottom = overlay.shape[0]
+
+    # Magenta pixels show exactly what passed the HSV blue threshold.
+    mask_large = cv2.resize(
+        blue_mask, (roi_right - roi_left, roi_bottom - roi_top),
+        interpolation=cv2.INTER_NEAREST)
+    roi = overlay[roi_top:roi_bottom, roi_left:roi_right]
+    selected = mask_large > 0
+    if np.any(selected):
+        tint = np.zeros_like(roi)
+        tint[:, :] = (255, 0, 255)
+        roi[selected] = (0.35 * roi[selected] + 0.65 * tint[selected]).astype(np.uint8)
+
+    # The green line is the same linear fit used by the decision code.
+    if count_blue > 2:
+        active_columns = np.flatnonzero(np.any(blue_mask > 0, axis=0))
+        if active_columns.size:
+            x1 = float(active_columns[0])
+            x2 = float(active_columns[-1])
+            p1 = (int(round(x1 * scale_x)),
+                  int(round((crop_y0 + k * x1 + c0) * scale_y)))
+            p2 = (int(round(x2 * scale_x)),
+                  int(round((crop_y0 + k * x2 + c0) * scale_y)))
+            cv2.line(overlay, p1, p2, (0, 255, 0), 4)
+            centre = (int(round(mid_x * scale_x)),
+                      int(round((crop_y0 + mid_y) * scale_y)))
+            cv2.circle(overlay, centre, 7, (0, 255, 255), -1)
+
+    cv2.rectangle(overlay, (roi_left, roi_top),
+                  (max(roi_left, roi_right - 1), roi_bottom - 1),
+                  (255, 255, 0), 2)
+    triggered = leng > 50
+    text_color = (0, 0, 255) if triggered else (255, 255, 255)
+    cv2.putText(overlay, 'BLUE LINE: ' + ('TRIGGER' if triggered else 'SEARCH'),
+                (20, 35), cv2.FONT_HERSHEY_SIMPLEX, 0.8, text_color, 2)
+    cv2.putText(overlay, 'leng=%d/50 pixels=%d mid_y=%.1f' %
+                (leng, count_blue, mid_y),
+                (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 0.65, text_color, 2)
+    cv2.putText(overlay, 'magenta=HSV mask  green=fitted line',
+                (20, 105), cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 255, 0), 2)
+
+    ok, encoded = cv2.imencode(
+        '.jpg', overlay, [int(cv2.IMWRITE_JPEG_QUALITY), 75])
+    if ok:
+        debug_msg = CompressedImage()
+        if header is not None:
+            debug_msg.header = header
+        else:
+            debug_msg.header.stamp = rospy.Time.now()
+        debug_msg.format = 'jpeg'
+        debug_msg.data = encoded.tostring()
+        blue_debug_pub.publish(debug_msg)
+
+
+def blue_line(img, header=None):
     """
     corr_img = cv2.undistort(img, intrinsicMat, distortionCoe, None, intrinsicMat)
     cv2.imshow("corr_img",corr_img)
@@ -468,14 +543,17 @@ def blue_line(img):
     blue_line_time=time.time()
     leng=0        
     k=0
+    c0=0
     mid_x=0
     mid_y=0
-    img = cv2.undistort(img, intrinsicMat, distortionCoe, None, intrinsicMat)#去畸变
-    img=cv2.resize(img,(96,128))
-    sp = img.shape[0:2]  
+    corrected = cv2.undistort(
+        img, intrinsicMat, distortionCoe, None, intrinsicMat)#去畸变
+    img=cv2.resize(corrected,(96,128))
+    sp = img.shape[0:2]
     h = sp[0]
     w = sp[1]
-    image = img[int(2*h/5):int(h),0:int(w)-20]
+    crop_y0 = int(2*h/5)
+    image = img[crop_y0:int(h),0:int(w)-20]
     # cv2.imshow("image",image)
     hsv=cv2.cvtColor(image,cv2.COLOR_BGR2HSV)
     # hsv1=hsv.copy()
@@ -506,6 +584,9 @@ def blue_line(img):
         mid_x=np.average(px)
         mid_y=np.average(py)
         k,c0=np.polyfit(px,py,1)
+    publish_blue_line_debug(
+        corrected, (h, w), crop_y0, blue_mask,
+        k, c0, mid_x, mid_y, leng, count_blue, header)
     # print(count_blue,np.arctan(k)*180/np.pi,mid_x,mid_y,leng)
 
     '''
@@ -578,7 +659,7 @@ def front_camera_callback(data):
     if laser_cmd == False:
         if mode == 0:#识别蓝线
             traffic_sign,condif,imid_x,imid_y=mbpp(img)
-            blue_point,line_k,mid_x,mid_y,leng = blue_line(img)
+            blue_point,line_k,mid_x,mid_y,leng = blue_line(img, data.header)
             print('blue_point,line_k,mid_x,mid_y,leng,angle',blue_point,line_k,mid_x,mid_y,leng,np.arctan(line_k)*180/np.pi)
             if leng>50 and time.time()-last_time >0:
                 print("stop line was detected")
@@ -596,7 +677,7 @@ def front_camera_callback(data):
         elif mode == 1:#识别蓝线后调整位姿使其正确通过蓝线
             stop_turn=True
             so_pub.publish(stop_turn)  #交由巡线控制
-            blue_point,line_k,mid_x,mid_y,leng = blue_line(img)
+            blue_point,line_k,mid_x,mid_y,leng = blue_line(img, data.header)
             print('blue_point,line_k,mid_x,mid_y,leng,angle',blue_point,line_k,mid_x,mid_y,leng,np.arctan(line_k)*180/np.pi)
             if traffic_sign==1 and mid_y>20:  #同上单独对右转设置条件
                 turn_right_angle=np.arctan(line_k)*180/np.pi
@@ -1685,9 +1766,12 @@ def detector():
     global slpub
     global pubresult
     global pubmode
+    global blue_debug_pub
+    global blue_debug_rate
     # global Vehicle_PID
     # global Reverse_PID
     rospy.init_node('stop_obj', anonymous=False)
+    blue_debug_rate = max(0.0, float(rospy.get_param('~blue_debug_rate', 8.0)))
     rospy.Subscriber("/usb_cam_2/image", Image, front_camera_callback, queue_size=1, buff_size=2**24)
     # rospy.Subscriber("/usb_cam_1/image", Image, rear_camera_callback, queue_size=1, buff_size=2**24)
     rospy.Subscriber("/laser_control", LaserControl, laser_callback, queue_size=1)
@@ -1696,6 +1780,10 @@ def detector():
     slpub = rospy.Publisher('/signal_line', Bool, queue_size=1)
     so_pub = rospy.Publisher('/stop_turn_cmd', Bool, queue_size=1)
     pubmode=rospy.Publisher('/mode', Int8, queue_size=1)
+    blue_debug_pub = rospy.Publisher(
+        '/stop_obj/blue_line/compressed', CompressedImage, queue_size=1)
+    rospy.loginfo('Blue-line debug: /stop_obj/blue_line/compressed at %.1f Hz max',
+                  blue_debug_rate)
     rospy.spin()
 
 if __name__ == '__main__':
