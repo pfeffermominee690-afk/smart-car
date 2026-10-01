@@ -772,12 +772,12 @@ class CameraLaneAvoidance(object):
                 '~straight_duration', 1.0, 0.1, 4.0),
             'right_speed': intersection_forward_speed,
             'right_angle': self.bounded_param(
-                '~right_angle', -18.0, -25.0, -3.0),
+                '~right_angle', 18.0, 3.0, 25.0),
             'right_duration': self.bounded_param(
                 '~right_duration', 1.5, 0.1, 4.0),
             'left_speed': intersection_forward_speed,
             'left_angle': self.bounded_param(
-                '~left_angle', 16.0, 3.0, 25.0),
+                '~left_angle', -16.0, -25.0, -3.0),
             'left_duration': self.bounded_param(
                 '~left_duration', 1.5, 0.1, 4.0),
             'uturn_forward_speed': intersection_forward_speed,
@@ -808,7 +808,8 @@ class CameraLaneAvoidance(object):
             intersection_config)
         self.intersection_controller.state_started = time.time()
 
-        # This car uses negative steering for right and positive for left.
+        # The calibrated lane controller uses positive steering for right and
+        # negative steering for left on this car.
         self.avoid_left = bool(rospy.get_param('~avoid_left', True))
         self.avoid_speed = float(rospy.get_param('~avoid_speed', -15.0))
         self.turn_angle = float(rospy.get_param('~turn_angle', 12.0))
