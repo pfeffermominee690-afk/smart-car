@@ -498,6 +498,11 @@ class PassiveIntersectionPerception(object):
 
         self.sign_threshold = float(rospy.get_param(
             '~sign_match_threshold', 0.95))
+        self.uturn_sign_threshold = float(rospy.get_param(
+            '~uturn_sign_match_threshold', 0.92))
+        rospy.loginfo(
+            'Traffic-sign thresholds: default=%.3f uturn=%.3f',
+            self.sign_threshold, self.uturn_sign_threshold)
         vote_window = max(1, int(rospy.get_param('~sign_vote_window', 8)))
         self.sign_confirm_votes = max(
             1, int(rospy.get_param('~sign_confirm_votes', 4)))
@@ -624,12 +629,18 @@ class PassiveIntersectionPerception(object):
             scores.append(float(cv2.minMaxLoc(response)[1]))
         sign_class = int(np.argmax(scores))
         confidence = float(scores[sign_class])
-        if confidence < self.sign_threshold:
+        threshold = (
+            self.uturn_sign_threshold
+            if self.SIGN_NAMES[sign_class] == 'uturn'
+            else self.sign_threshold)
+        if confidence < threshold:
             return {'class_id': None, 'name': 'unknown',
-                    'confidence': confidence, 'bbox': list(box)}
+                    'confidence': confidence, 'threshold': threshold,
+                    'bbox': list(box)}
         return {'class_id': sign_class,
                 'name': self.SIGN_NAMES[sign_class],
-                'confidence': confidence, 'bbox': list(box)}
+                'confidence': confidence, 'threshold': threshold,
+                'bbox': list(box)}
 
     def update_sign_vote(self, detection):
         class_id = None if detection is None else detection.get('class_id')
