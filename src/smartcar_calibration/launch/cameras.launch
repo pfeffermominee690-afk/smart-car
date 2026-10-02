@@ -1,0 +1,25 @@
+<launch>
+  <!-- Opt in to each driver; never start a second node for an already running camera. -->
+  <arg name="front" default="false" />
+  <arg name="rear" default="false" />
+  <arg name="front_url" default="" />
+  <arg name="rear_url" default="" />
+  <arg name="front_device" default="/dev/v4l/by-path/platform-70090000.xusb-usb-0:2.3:1.0-video-index0" />
+  <arg name="rear_device" default="/dev/v4l/by-path/platform-70090000.xusb-usb-0:2.4:1.0-video-index0" />
+  <node if="$(arg front)" name="usb_cam_2" pkg="usb_cam" type="usb_cam_node" output="screen">
+    <param name="video_device" value="$(arg front_device)" />
+    <param name="image_width" value="640" /><param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" /><param name="io_method" value="mmap" />
+    <param name="image_topic" value="image" /><param name="camera_frame_id" value="front_camera_optical" />
+    <param name="camera_name" value="smartcar_front" /><param name="camera_info_url" value="$(arg front_url)" />
+    <param name="autofocus" value="false" />
+  </node>
+  <node if="$(arg rear)" name="usb_cam_1" pkg="usb_cam" type="usb_cam_node" output="screen">
+    <param name="video_device" value="$(arg rear_device)" />
+    <param name="image_width" value="640" /><param name="image_height" value="480" />
+    <param name="pixel_format" value="yuyv" /><param name="io_method" value="mmap" />
+    <param name="image_topic" value="image" /><param name="camera_frame_id" value="rear_camera_optical" />
+    <param name="camera_name" value="smartcar_rear" /><param name="camera_info_url" value="$(arg rear_url)" />
+    <param name="autofocus" value="false" />
+  </node>
+</launch>
