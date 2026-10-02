@@ -762,6 +762,28 @@ class CameraLaneAvoidance(object):
         intersection_forward_speed = self.tracker.lane_speed
         intersection_config = {
             'enabled': self.intersection_control_enabled,
+            'blue_align_speed': self.bounded_param(
+                '~blue_align_speed', -10.0, -20.0, -3.0),
+            'blue_target_angle_deg': self.bounded_param(
+                '~blue_target_angle_deg', 0.0, -30.0, 30.0),
+            'blue_angle_kp': self.bounded_param(
+                '~blue_angle_kp', 0.4, 0.0, 2.0),
+            'blue_align_max_steering': self.bounded_param(
+                '~blue_align_max_steering', 8.0, 1.0, 15.0),
+            'blue_stop_mid_y': self.bounded_param(
+                '~blue_stop_mid_y', 28.0, 0.0, 76.0),
+            'blue_angle_tolerance_deg': self.bounded_param(
+                '~blue_angle_tolerance_deg', 3.0, 0.5, 15.0),
+            'blue_stop_mid_y_tolerance': self.bounded_param(
+                '~blue_stop_mid_y_tolerance', 4.0, 1.0, 15.0),
+            'blue_align_confirm_frames': max(
+                1, min(10, int(rospy.get_param(
+                    '~blue_align_confirm_frames', 3)))),
+            'blue_align_missing_frames': max(
+                1, min(10, int(rospy.get_param(
+                    '~blue_align_missing_frames', 2)))),
+            'blue_align_timeout': self.bounded_param(
+                '~blue_align_timeout', 4.0, 0.5, 8.0),
             'approach_speed': intersection_forward_speed,
             'approach_timeout': self.bounded_param(
                 '~intersection_approach_timeout', 2.0, 0.3, 4.0),
@@ -1307,6 +1329,8 @@ class CameraLaneAvoidance(object):
                 self.latest_intersection_time if fresh else None),
             'blue_confirmed': bool(blue.get('confirmed', False)),
             'blue_raw': bool(blue.get('raw', False)),
+            'blue_angle_deg': float(blue.get('angle_deg', 0.0)),
+            'blue_mid_y': float(blue.get('mid_y', 0.0)),
             'stable_sign': (
                 'none' if latest is None else
                 latest.get('sign_stable_name', 'none')),

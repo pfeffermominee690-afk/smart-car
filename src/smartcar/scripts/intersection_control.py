@@ -3,6 +3,7 @@ from __future__ import print_function
 
 
 IDLE = 'INTERSECTION_IDLE'
+ALIGN_BLUE = 'INTERSECTION_ALIGN_BLUE'
 WAIT_SIGN = 'INTERSECTION_WAIT_SIGN'
 APPROACH = 'INTERSECTION_APPROACH'
 STRAIGHT = 'INTERSECTION_STRAIGHT'
@@ -30,6 +31,8 @@ class IntersectionController(object):
         self.latched_sign = None
         self.held_lane_steering = 0.0
         self.blue_clear_count = 0
+        self.blue_align_count = 0
+        self.blue_missing_count = 0
         self.reacquire_count = 0
         self.armed = True
         self.rearm_at = 0.0
@@ -51,6 +54,8 @@ class IntersectionController(object):
         self.latched_sign = None
         self.held_lane_steering = 0.0
         self.blue_clear_count = 0
+        self.blue_align_count = 0
+        self.blue_missing_count = 0
         self.reacquire_count = 0
         self.armed = False
         self.rearm_at = float(now)+float(self.config['rearm_seconds'])
@@ -125,6 +130,18 @@ class IntersectionController(object):
         self.transition(REACQUIRE, now)
         return self.result(command=(0.0, 0.0), reset_tracker=True)
 
+    def blue_align_command(self, perception, lane_valid, lane_steering):
+        angle_error = (
+            float(perception.get('blue_angle_deg', 0.0))-
+            float(self.config['blue_target_angle_deg']))
+        correction = float(self.config['blue_angle_kp'])*angle_error
+        base_steering = (
+            float(lane_steering) if lane_valid else
+            float(self.held_lane_steering))
+        limit = float(self.config['blue_align_max_steering'])
+        steering = max(-limit, min(limit, base_steering+correction))
+        return (float(self.config['blue_align_speed']), steering)
+
     def step(self, now, perception, avoidance_state, lane_valid,
              lane_steering, front_blocked, safety_fault=None,
              lane_sample_id=None):
@@ -145,10 +162,14 @@ class IntersectionController(object):
             self.held_lane_steering = float(lane_steering)
             self.latched_sign = None
             self.blue_clear_count = 0
+            self.blue_align_count = 0
+            self.blue_missing_count = 0
             self.fault = None
-            self.transition(WAIT_SIGN, now)
+            self.transition(ALIGN_BLUE, now)
             return self.result(
-                command=(0.0, 0.0), reset_sign_votes=True)
+                command=self.blue_align_command(
+                    perception, lane_valid, lane_steering),
+                reset_sign_votes=True)
 
         if front_blocked:
             self.stop_with_fault(now, 'front obstacle during intersection')
@@ -165,6 +186,53 @@ class IntersectionController(object):
                 not perception.get('fresh', False)):
             self.stop_with_fault(now, 'intersection perception timeout')
             return self.result(command=(0.0, 0.0))
+
+        if self.state == ALIGN_BLUE:
+            if now-self.state_started >= float(
+                    self.config['blue_align_timeout']):
+                self.transition(WAIT_SIGN, now)
+                return self.result(
+                    command=(0.0, 0.0), reset_sign_votes=True)
+
+            if new_perception:
+                if perception.get('blue_raw', False):
+                    self.blue_missing_count = 0
+                    angle_error = abs(
+                        float(perception.get('blue_angle_deg', 0.0))-
+                        float(self.config['blue_target_angle_deg']))
+                    mid_y = float(perception.get('blue_mid_y', 0.0))
+                    angle_ready = angle_error <= float(
+                        self.config['blue_angle_tolerance_deg'])
+                    position_ready = mid_y >= (
+                        float(self.config['blue_stop_mid_y'])-
+                        float(self.config['blue_stop_mid_y_tolerance']))
+                    if angle_ready and position_ready:
+                        self.blue_align_count += 1
+                    else:
+                        self.blue_align_count = 0
+
+                    hard_stop_row = (
+                        float(self.config['blue_stop_mid_y'])+
+                        max(8.0, 2.0*float(
+                            self.config['blue_stop_mid_y_tolerance'])))
+                    if mid_y >= hard_stop_row:
+                        self.transition(WAIT_SIGN, now)
+                        return self.result(
+                            command=(0.0, 0.0), reset_sign_votes=True)
+                else:
+                    self.blue_missing_count += 1
+                    self.blue_align_count = 0
+
+            if (self.blue_align_count >= int(
+                    self.config['blue_align_confirm_frames']) or
+                    self.blue_missing_count >= int(
+                    self.config['blue_align_missing_frames'])):
+                self.transition(WAIT_SIGN, now)
+                return self.result(
+                    command=(0.0, 0.0), reset_sign_votes=True)
+
+            return self.result(command=self.blue_align_command(
+                perception, lane_valid, lane_steering))
 
         if self.state == WAIT_SIGN:
             sign = perception.get('stable_sign', 'none')
